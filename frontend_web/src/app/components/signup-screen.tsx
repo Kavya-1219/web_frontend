@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 import logo from "figma:asset/92b2cb3a86bea6d7f9af7d0e725e0f2b7664fe56.png";
 
 export function SignUpScreen() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    general: ""
   });
   const [formData, setFormData] = useState({
     email: "",
@@ -36,43 +39,60 @@ export function SignUpScreen() {
     return "";
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({ email: "", password: "", confirmPassword: "", general: "" });
     
-    // Validate email
+    // Validate local checks
     const emailError = validateEmail(formData.email);
     const passwordError = validatePassword(formData.password);
     
     if (emailError || passwordError) {
-      setErrors({
-        email: emailError,
-        password: passwordError,
-        confirmPassword: ""
-      });
+      setErrors(prev => ({ ...prev, email: emailError, password: passwordError }));
       return;
     }
     
     if (formData.password !== formData.confirmPassword) {
-      setErrors({
-        email: "",
-        password: "",
-        confirmPassword: "Passwords don't match!"
-      });
+      setErrors(prev => ({ ...prev, confirmPassword: "Passwords don't match!" }));
       return;
     }
+
+    setIsLoading(true);
     
-    // Save user credentials
-    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    users.push({
-      email: formData.email,
-      password: formData.password,
-      registeredAt: new Date().toISOString()
-    });
-    localStorage.setItem('registeredUsers', JSON.stringify(users));
-    localStorage.setItem('currentUserEmail', formData.email);
-    
-    // Show success modal
-    setShowSuccessModal(true);
+    try {
+      const response = await api.post(endpoints.register, {
+        username: formData.email,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword
+      });
+
+      if (response.data && response.data.token) {
+        // Save user credentials and token
+        localStorage.setItem('user', JSON.stringify({
+          email: response.data.email,
+          username: response.data.username,
+          token: response.data.token,
+          user_id: response.data.user_id
+        }));
+        
+        localStorage.setItem('currentUserEmail', response.data.email);
+        
+        // Show success modal
+        setShowSuccessModal(true);
+      }
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      if (err.response?.data?.email) {
+        setErrors(prev => ({ ...prev, email: err.response.data.email[0] }));
+      } else if (err.response?.data?.username) {
+        setErrors(prev => ({ ...prev, email: "This email is already in use." }));
+      } else {
+        setErrors(prev => ({ ...prev, general: "Registration failed. Please try again." }));
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateField = (field: string, value: string) => {
@@ -183,12 +203,27 @@ export function SignUpScreen() {
               </p>
             </div>
 
+            {/* General Error */}
+            {errors.general && (
+              <p className="text-sm text-red-500 text-center font-medium bg-red-50 py-2 rounded-lg">
+                {errors.general}
+              </p>
+            )}
+
             {/* Sign Up Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-[1.01] active:scale-[0.99]"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center disabled:opacity-70 disabled:scale-100"
             >
-              Create Account
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
             </button>
 
             {/* Login Link */}

@@ -72,6 +72,10 @@ class FoodScanService:
                     results.append(mapped)
 
             if not results:
+                # Fallback: Try identifying from filename if Gemini failed
+                results = self._fallback_from_filename(image_file)
+                if results:
+                    return results, "success"
                 return [], "No confident food detected"
 
             # 3. Exact response format for success
@@ -180,7 +184,7 @@ Rules:
             return None
 
         logger.info("Attempting DB match for name: %s", name)
-        db_food = self._find_food_match(name)
+        db_food = self._find_food_match(name, confidence)
 
         if db_food:
             logger.info("Matched DB food: input=%s db=%s", name, db_food.name)
@@ -216,7 +220,7 @@ Rules:
             "confidence": confidence,
         }
 
-    def _find_food_match(self, name: str):
+    def _find_food_match(self, name: str, confidence: float = 0.5):
         name = name.strip()
         if not name:
             return None
@@ -241,17 +245,44 @@ Rules:
                 logger.info("Found normalized DB match: %s -> %s", candidate, match.name)
                 return match
 
-        # 3. Only use whole important words (min 4 chars), not broad icontains
-        words = [w.lower() for w in re.findall(r"[A-Za-z]+", name) if len(w) >= 4]
+        # 3. Check each word with singular/plural normalization
+        words = [w.lower() for w in re.findall(r"[A-Za-z]{3,}", name)] # 3+ chars
         for word in words:
             if word in self.BLACKLIST:
                 continue
 
-            # Strict word match
+            # Try exact match for word
             match = FoodItem.objects.filter(name__iexact=word).first()
             if match:
                 logger.info("Found strict word DB match: %s -> %s", word, match.name)
                 return match
+            
+            # Try normalized word (singular/plural)
+            word_candidates = {word}
+            if word.endswith("s"):
+                word_candidates.add(word[:-1])
+            else:
+                word_candidates.add(word + "s")
+                
+            for wc in word_candidates:
+                if wc == word: continue
+                match = FoodItem.objects.filter(name__iexact=wc).first()
+                if match:
+                    logger.info("Found normalized word DB match: %s -> %s", wc, match.name)
+                    return match
+
+        # 4. Final broad check for high-confidence results
+        # If confidence is high, we can be more aggressive with partial matches
+        for word in words:
+            if word in self.BLACKLIST or len(word) < 4:
+                continue
+            
+            # Be more selective about icontains unless confidence is quite high
+            if confidence >= 0.8:
+                match = FoodItem.objects.filter(name__icontains=word).first()
+                if match:
+                    logger.info("Found broad partial DB match for word '%s': %s", word, match.name)
+                    return match
 
         logger.info("No safe DB match found for: %s", name)
         return None

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChefHat, Clock, Flame, Users, Search, Heart } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 interface Recipe {
   id: number;
@@ -18,7 +19,7 @@ interface Recipe {
   image: string;
 }
 
-const recipes: Recipe[] = [
+const localRecipes: Recipe[] = [
   // Breakfast
   {
     id: 1,
@@ -451,18 +452,55 @@ export function RecipesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [favorites, setFavorites] = useState<number[]>([]);
+  const [recipeList, setRecipeList] = useState<Recipe[]>(localRecipes);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      setIsLoading(true);
+      try {
+        const response = await api.get(endpoints.recipes);
+        if (response.data && Array.isArray(response.data)) {
+          // Map backend snake_case to frontend camelCase
+          const mappedRecipes = response.data.map((r: any) => ({
+            ...r,
+            cookTime: r.cook_time || r.cookTime,
+          }));
+          setRecipeList(mappedRecipes);
+        } else if (response.data?.results && Array.isArray(response.data.results)) {
+           // Handle paginated responses if backend uses them
+           const mappedRecipes = response.data.results.map((r: any) => ({
+            ...r,
+            cookTime: r.cook_time || r.cookTime,
+          }));
+          setRecipeList(mappedRecipes);
+        }
+      } catch (error) {
+        console.error("Failed to fetch recipes from backend, using fallback:", error);
+        setRecipeList(localRecipes);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecipes();
+  }, []);
 
   const categories = [
     { id: "all", label: "All", emoji: "🍽️" },
+    { id: "favorites", label: "Favorites", emoji: "❤️" },
     { id: "breakfast", label: "Breakfast", emoji: "🌅" },
     { id: "lunch", label: "Lunch", emoji: "☀️" },
     { id: "snack", label: "Snacks", emoji: "🍪" },
     { id: "dinner", label: "Dinner", emoji: "🌙" }
   ];
 
-  const filteredRecipes = recipes.filter(recipe => {
-    const matchesCategory = selectedCategory === "all" || recipe.category === selectedCategory;
+  const filteredRecipes = recipeList.filter(recipe => {
     const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (selectedCategory === "favorites") {
+      return favorites.includes(recipe.id) && matchesSearch;
+    }
+    const matchesCategory = selectedCategory === "all" || recipe.category.toLowerCase() === selectedCategory.toLowerCase();
     return matchesCategory && matchesSearch;
   });
 

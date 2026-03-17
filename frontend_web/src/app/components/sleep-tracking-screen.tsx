@@ -109,16 +109,18 @@ export function SleepTrackingScreen() {
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-900/20 pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 dark:from-indigo-700 dark:to-purple-800 pt-8 pb-20 px-6 rounded-b-[2rem]">
-        <div className="flex items-center space-x-3 mb-3">
-          <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
-          <Moon className="w-8 h-8 text-white" />
-          <h1 className="text-2xl text-white font-semibold">Sleep Tracking</h1>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center space-x-3 mb-3">
+            <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
+            <Moon className="w-8 h-8 text-white" />
+            <h1 className="text-2xl text-white font-semibold">Sleep Tracking</h1>
+          </div>
+          <p className="text-indigo-50">Quality sleep for a healthier you</p>
         </div>
-        <p className="text-indigo-50">Quality sleep for a healthier you</p>
       </div>
 
       {/* Main Card */}
-      <div className="px-6 -mt-12 space-y-6">
+      <div className="max-w-7xl mx-auto px-6 -mt-12 space-y-6">
         {/* Today's Sleep */}
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
           <div className="text-center mb-6">
@@ -179,34 +181,45 @@ export function SleepTrackingScreen() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
           <h3 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center space-x-2">
             <Sun className="w-6 h-6 text-yellow-500" />
-            <span>Benefits of Good Sleep</span>
+            <span>Benefits of Quality Sleep</span>
           </h3>
           <ul className="space-y-3">
             <li className="flex items-start space-x-3">
               <span className="text-indigo-500 mt-0.5">💤</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Weight Management</strong> - Regulates hunger hormones
+                <strong>Hormone Regulation</strong> - Balances hunger hormones (ghrelin & leptin)
               </p>
             </li>
             <li className="flex items-start space-x-3">
               <span className="text-indigo-500 mt-0.5">💤</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Mental Clarity</strong> - Improves focus and decision-making
+                <strong>Mental Clarity</strong> - Improves focus, memory, and decision-making
               </p>
             </li>
             <li className="flex items-start space-x-3">
               <span className="text-indigo-500 mt-0.5">💤</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Muscle Recovery</strong> - Essential for workout gains
+                <strong>Muscle Recovery</strong> - Essential for tissue repair and workout gains
               </p>
             </li>
             <li className="flex items-start space-x-3">
               <span className="text-indigo-500 mt-0.5">💤</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Mood Boost</strong> - Reduces stress and anxiety
+                <strong>Mood & Stress</strong> - Reduces cortisol and improves emotional balance
+              </p>
+            </li>
+            <li className="flex items-start space-x-3">
+              <span className="text-indigo-500 mt-0.5">💤</span>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                <strong>Metabolic Health</strong> - Supports insulin sensitivity and fat metabolism
               </p>
             </li>
           </ul>
+          <div className="mt-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-3">
+            <p className="text-xs text-indigo-700 dark:text-indigo-300 italic">
+              💡 Note: Sleep doesn't burn "bonus" calories—BMR already includes sleep metabolism. Quality sleep supports weight management by regulating hunger hormones and reducing cravings.
+            </p>
+          </div>
         </div>
 
         {/* Sleep Tips */}

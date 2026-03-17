@@ -1,49 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Search, Plus, Minus, Check, X, UtensilsCrossed, TrendingUp, TrendingDown, Camera, Upload, Sparkles, AlertCircle, ArrowLeft } from "lucide-react";
+import { Search, Plus, Minus, Check, X, UtensilsCrossed, TrendingUp, TrendingDown, Camera, Upload, Sparkles, AlertCircle, ArrowLeft, Zap, Info } from "lucide-react";
 import { getUserProfile } from "@/app/helpers/meal-plan-helper";
-
-// Expanded food database with comprehensive nutrition
-const foodDatabase = [
-  // Fruits
-  { name: "Banana", calories: 105, protein: 1.3, carbs: 27, fats: 0.3, fiber: 3.1, vitaminC: 10, potassium: 422, iron: 0.3, calcium: 6, unit: "1 medium (118g)", category: "Fruits" },
-  { name: "Apple", calories: 95, protein: 0.5, carbs: 25, fats: 0.3, fiber: 4.4, vitaminC: 8, potassium: 195, iron: 0.2, calcium: 11, unit: "1 medium (182g)", category: "Fruits" },
-  { name: "Orange", calories: 62, protein: 1.2, carbs: 15, fats: 0.2, fiber: 3.1, vitaminC: 70, potassium: 237, iron: 0.1, calcium: 52, unit: "1 medium (131g)", category: "Fruits" },
-  { name: "Mango", calories: 60, protein: 0.8, carbs: 15, fats: 0.4, fiber: 1.6, vitaminC: 36, potassium: 168, iron: 0.2, calcium: 11, unit: "100g", category: "Fruits" },
-  { name: "Watermelon", calories: 30, protein: 0.6, carbs: 8, fats: 0.2, fiber: 0.4, vitaminC: 8, potassium: 112, iron: 0.2, calcium: 7, unit: "100g", category: "Fruits" },
-  
-  // Proteins
-  { name: "Chicken Breast", calories: 165, protein: 31, carbs: 0, fats: 3.6, fiber: 0, vitaminC: 0, potassium: 256, iron: 0.9, calcium: 15, unit: "100g", category: "Proteins" },
-  { name: "Salmon", calories: 208, protein: 20, carbs: 0, fats: 13, fiber: 0, vitaminC: 0, potassium: 628, iron: 0.8, calcium: 12, unit: "100g", category: "Proteins" },
-  { name: "Eggs", calories: 155, protein: 13, carbs: 1.1, fats: 11, fiber: 0, vitaminC: 0, potassium: 138, iron: 1.8, calcium: 56, unit: "2 large", category: "Proteins" },
-  { name: "Paneer", calories: 265, protein: 18, carbs: 3.6, fats: 20, fiber: 0, vitaminC: 0, potassium: 256, iron: 0.2, calcium: 480, unit: "100g", category: "Proteins" },
-  { name: "Tofu", calories: 76, protein: 8, carbs: 1.9, fats: 4.8, fiber: 0.3, vitaminC: 0, potassium: 121, iron: 5.4, calcium: 350, unit: "100g", category: "Proteins" },
-  { name: "Lentils (Dal)", calories: 116, protein: 9, carbs: 20, fats: 0.4, fiber: 7.9, vitaminC: 1, potassium: 369, iron: 3.3, calcium: 19, unit: "100g cooked", category: "Proteins" },
-  
-  // Carbs
-  { name: "Brown Rice", calories: 216, protein: 5, carbs: 45, fats: 1.8, fiber: 3.5, vitaminC: 0, potassium: 154, iron: 0.8, calcium: 20, unit: "1 cup cooked", category: "Carbs" },
-  { name: "White Rice", calories: 205, protein: 4.3, carbs: 45, fats: 0.4, fiber: 0.6, vitaminC: 0, potassium: 55, iron: 0.2, calcium: 16, unit: "1 cup cooked", category: "Carbs" },
-  { name: "Roti (Chapati)", calories: 71, protein: 3, carbs: 15, fats: 0.4, fiber: 2.7, vitaminC: 0, potassium: 58, iron: 0.9, calcium: 10, unit: "1 medium", category: "Carbs" },
-  { name: "Quinoa", calories: 222, protein: 8, carbs: 39, fats: 3.6, fiber: 5.2, vitaminC: 0, potassium: 318, iron: 2.8, calcium: 31, unit: "1 cup cooked", category: "Carbs" },
-  { name: "Oats", calories: 389, protein: 17, carbs: 66, fats: 7, fiber: 10.6, vitaminC: 0, potassium: 429, iron: 4.7, calcium: 54, unit: "100g", category: "Carbs" },
-  { name: "Sweet Potato", calories: 86, protein: 1.6, carbs: 20, fats: 0.1, fiber: 3, vitaminC: 2, potassium: 337, iron: 0.6, calcium: 30, unit: "100g", category: "Carbs" },
-  
-  // Dairy
-  { name: "Greek Yogurt", calories: 100, protein: 10, carbs: 6, fats: 4, fiber: 0, vitaminC: 0, potassium: 220, iron: 0.1, calcium: 200, unit: "150g", category: "Dairy" },
-  { name: "Milk", calories: 122, protein: 8, carbs: 12, fats: 5, fiber: 0, vitaminC: 0, potassium: 366, iron: 0.1, calcium: 276, unit: "1 cup", category: "Dairy" },
-  { name: "Curd", calories: 98, protein: 11, carbs: 4.7, fats: 4.3, fiber: 0, vitaminC: 0, potassium: 234, iron: 0.1, calcium: 275, unit: "1 cup", category: "Dairy" },
-  
-  // Snacks & Others
-  { name: "Almonds", calories: 164, protein: 6, carbs: 6, fats: 14, fiber: 3.5, vitaminC: 0, potassium: 208, iron: 1.1, calcium: 76, unit: "28g (23 almonds)", category: "Snacks" },
-  { name: "Peanut Butter", calories: 188, protein: 8, carbs: 7, fats: 16, fiber: 1.6, vitaminC: 0, potassium: 189, iron: 0.5, calcium: 17, unit: "2 tbsp", category: "Snacks" },
-  { name: "Avocado", calories: 234, protein: 2.9, carbs: 12, fats: 21, fiber: 10, vitaminC: 20, potassium: 708, iron: 0.8, calcium: 18, unit: "1 whole", category: "Snacks" },
-  { name: "Dark Chocolate", calories: 155, protein: 1.4, carbs: 17, fats: 9, fiber: 2.2, vitaminC: 0, potassium: 158, iron: 2.3, calcium: 16, unit: "28g", category: "Snacks" },
-  
-  // Vegetables
-  { name: "Broccoli", calories: 55, protein: 3.7, carbs: 11, fats: 0.6, fiber: 2.4, vitaminC: 89, potassium: 288, iron: 0.7, calcium: 43, unit: "1 cup", category: "Vegetables" },
-  { name: "Spinach", calories: 23, protein: 2.9, carbs: 3.6, fats: 0.4, fiber: 2.2, vitaminC: 28, potassium: 558, iron: 2.7, calcium: 99, unit: "100g", category: "Vegetables" },
-  { name: "Carrot", calories: 41, protein: 0.9, carbs: 10, fats: 0.2, fiber: 2.8, vitaminC: 6, potassium: 320, iron: 0.3, calcium: 33, unit: "1 medium", category: "Vegetables" },
-];
+import { foodDatabase, getPersonalizedFoods, searchFoods, type FoodItem } from "@/app/helpers/food-database";
+import { calculateUserMetrics, calculateDailyCalorieTarget } from "@/app/helpers/smart-health-system";
+import { scanFoodImage, generatePersonalizedSuggestions, getPersonalizedAlternatives, type ScannedNutrition, type UserHealthProfile, type NutritionSuggestion } from "@/app/helpers/ai-food-scanner";
+import api, { endpoints } from "../helpers/api";
 
 interface LoggedFood {
   name: string;
@@ -56,28 +18,20 @@ interface LoggedFood {
   timestamp: string;
 }
 
-interface ScannedFood {
-  name: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  unit: string;
-  quantity: number;
-  image: string;
-  confidence: number;
-}
-
 export function FoodLoggingScreen() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedFood, setSelectedFood] = useState<typeof foodDatabase[0] | null>(null);
+  const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showImageScan, setShowImageScan] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [scannedFood, setScannedFood] = useState<ScannedFood | null>(null);
+  const [scannedNutrition, setScannedNutrition] = useState<ScannedNutrition | null>(null);
+  const [suggestions, setSuggestions] = useState<NutritionSuggestion[]>([]);
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [scannedQuantity, setScannedQuantity] = useState(1);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [manualFood, setManualFood] = useState({
     name: "",
     quantity: "",
@@ -90,11 +44,47 @@ export function FoodLoggingScreen() {
   const [todayCarbs, setTodayCarbs] = useState(0);
   const [todayFats, setTodayFats] = useState(0);
 
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
-    const profile = getUserProfile();
-    setTargetCalories(profile.targetCalories);
-    loadTodayLogs();
+    const fetchData = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchProfileData(),
+        fetchMacrosData()
+      ]);
+      setIsLoading(false);
+    };
+    fetchData();
   }, []);
+
+  const fetchProfileData = async () => {
+    try {
+      const response = await api.get(endpoints.home);
+      if (response.data) {
+        setTargetCalories(response.data.daily_calorie_goal || 2000);
+      }
+    } catch (error) {
+      console.error("Profile fetch failed:", error);
+      const profile = getUserProfile();
+      setTargetCalories(profile.targetCalories);
+    }
+  };
+
+  const fetchMacrosData = async () => {
+    try {
+      const response = await api.get("/today-macros/");
+      if (response.data) {
+        setTodayCalories(Math.round(response.data.calories || 0));
+        setTodayProtein(Math.round(response.data.protein || 0));
+        setTodayCarbs(Math.round(response.data.carbs || 0));
+        setTodayFats(Math.round(response.data.fats || 0));
+      }
+    } catch (error) {
+      console.error("Macros fetch failed:", error);
+      loadTodayLogs();
+    }
+  };
 
   const loadTodayLogs = () => {
     const today = new Date().toDateString();
@@ -140,133 +130,183 @@ export function FoodLoggingScreen() {
   const analyzeImage = async (imageData: string) => {
     setIsScanning(true);
     
-    // Simulate AI processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Simulate AI food detection
-    const detectedFoods = [
-      { name: "Grilled Chicken Salad", calories: 320, protein: 38, carbs: 15, fats: 12, unit: "1 serving", quantity: 1, confidence: 0.94 },
-      { name: "Mixed Rice Bowl", calories: 450, protein: 12, carbs: 68, fats: 14, unit: "1 bowl", quantity: 1, confidence: 0.89 },
-      { name: "Paneer Tikka", calories: 280, protein: 22, carbs: 8, fats: 18, unit: "150g", quantity: 1, confidence: 0.92 },
-      { name: "Fruit Salad", calories: 120, protein: 2, carbs: 28, fats: 0.5, unit: "1 cup", quantity: 1, confidence: 0.91 },
-      { name: "Pasta Primavera", calories: 380, protein: 14, carbs: 52, fats: 13, unit: "1 plate", quantity: 1, confidence: 0.87 }
-    ];
-    
-    const randomFood = detectedFoods[Math.floor(Math.random() * detectedFoods.length)];
-    
-    setScannedFood({
-      ...randomFood,
-      image: imageData
-    });
-    setIsScanning(false);
-  };
-
-  const getSuggestion = (food: ScannedFood) => {
-    const foodCalories = food.calories * food.quantity;
-    const remainingCalories = targetCalories - todayCalories;
-    const percentageOfDaily = (foodCalories / targetCalories) * 100;
-
-    if (remainingCalories < foodCalories * 0.5) {
-      const suggestedQuantity = Math.max(0.3, (remainingCalories / food.calories)).toFixed(1);
-      return {
-        type: 'decrease',
-        message: `Consider reducing to ${suggestedQuantity}x portion`,
-        reason: `This will add ${foodCalories} kcal, but you only have ${remainingCalories} kcal remaining today.`
-      };
-    } else if (remainingCalories > foodCalories * 2 && todayCalories < targetCalories * 0.5) {
-      return {
-        type: 'increase',
-        message: `You can eat ${(remainingCalories / food.calories).toFixed(1)}x more`,
-        reason: `You still have ${remainingCalories} kcal to reach your daily goal.`
-      };
-    } else {
-      return {
-        type: 'perfect',
-        message: 'Perfect portion size!',
-        reason: `This meal is ${percentageOfDaily.toFixed(0)}% of your daily target.`
-      };
+    try {
+      // Use the AI scanner helper
+      const nutrition = await scanFoodImage(imageData);
+      setScannedNutrition(nutrition);
+      
+      // Get user profile for personalized suggestions
+      const userProfile = getUserHealthProfile();
+      
+      // Generate personalized suggestions
+      const personalizedSuggestions = generatePersonalizedSuggestions(nutrition, userProfile, scannedQuantity);
+      setSuggestions(personalizedSuggestions);
+      
+      // Get alternative recommendations
+      const altRecommendations = getPersonalizedAlternatives(nutrition, userProfile);
+      setAlternatives(altRecommendations);
+      setScanError(null);
+      
+    } catch (error: any) {
+      console.error('Error scanning food:', error);
+      setScanError(error.message || "Unable to detect food. Please try with a clearer image.");
+      setScannedNutrition(null);
+    } finally {
+      setIsScanning(false);
     }
   };
 
-  const logScannedFood = () => {
-    if (!scannedFood) return;
-
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`foodLogs_${email}`) || '[]');
+  const getUserHealthProfile = (): UserHealthProfile => {
+    const profile = getUserProfile();
+    const bmi = profile.weight / ((profile.height / 100) ** 2);
     
-    logs.push({
-      name: scannedFood.name,
-      calories: scannedFood.calories,
-      protein: scannedFood.protein,
-      carbs: scannedFood.carbs,
-      fats: scannedFood.fats,
-      quantity: scannedFood.quantity,
-      unit: scannedFood.unit,
-      timestamp: new Date().toISOString()
-    });
-    
-    localStorage.setItem(`foodLogs_${email}`, JSON.stringify(logs));
-    
-    // Reset
-    setScannedFood(null);
-    setUploadedImage(null);
-    setShowImageScan(false);
-    loadTodayLogs();
+    return {
+      age: profile.age,
+      weight: profile.weight,
+      height: profile.height,
+      bmi,
+      goal: profile.goal,
+      healthConditions: profile.healthConditions || [],
+      dietType: profile.dietType,
+      allergies: profile.allergicFoods || [],
+      dislikes: [], // Dislikes could be added to profile later
+      dailyCalorieTarget: targetCalories,
+      currentCaloriesConsumed: todayCalories
+    };
   };
 
-  const logFood = () => {
+  const logScannedFood = async () => {
+    if (!scannedNutrition) return;
+
+    const mealData = {
+      meal_type: "breakfast", // Can be dynamic based on time
+      food_name: scannedNutrition.name,
+      calories: scannedNutrition.calories * scannedQuantity,
+      protein: scannedNutrition.protein * scannedQuantity,
+      carbs: scannedNutrition.carbs * scannedQuantity,
+      fats: scannedNutrition.fats * scannedQuantity,
+      quantity: scannedQuantity * 100, // Sync with backend's expectativa of g
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    try {
+      await api.post(endpoints.logFood, mealData);
+      fetchMacrosData();
+    } catch (error) {
+      console.error("Backend logging failed, falling back to local:", error);
+      const email = localStorage.getItem('currentUserEmail');
+      const logs = JSON.parse(localStorage.getItem(`foodLogs_${email}`) || '[]');
+      
+      logs.push({
+        name: scannedNutrition.name,
+        calories: scannedNutrition.calories,
+        protein: scannedNutrition.protein,
+        carbs: scannedNutrition.carbs,
+        fats: scannedNutrition.fats,
+        quantity: scannedQuantity,
+        unit: scannedNutrition.servingSize,
+        timestamp: new Date().toISOString()
+      });
+      
+      localStorage.setItem(`foodLogs_${email}`, JSON.stringify(logs));
+      loadTodayLogs();
+    }
+    
+    // Reset
+    setScannedNutrition(null);
+    setSuggestions([]);
+    setAlternatives([]);
+    setUploadedImage(null);
+    setShowImageScan(false);
+    setScannedQuantity(1);
+    window.dispatchEvent(new Event('storage'));
+  };
+
+  const logFood = async () => {
     if (!selectedFood) return;
 
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`foodLogs_${email}`) || '[]');
-    
-    logs.push({
-      name: selectedFood.name,
-      calories: selectedFood.calories,
-      protein: selectedFood.protein,
-      carbs: selectedFood.carbs,
-      fats: selectedFood.fats,
-      quantity: quantity,
-      unit: selectedFood.unit,
-      timestamp: new Date().toISOString()
-    });
-    
-    localStorage.setItem(`foodLogs_${email}`, JSON.stringify(logs));
+    const mealData = {
+      meal_type: "breakfast",
+      food_name: selectedFood.name,
+      calories: selectedFood.calories * quantity,
+      protein: selectedFood.protein * quantity,
+      carbs: selectedFood.carbs * quantity,
+      fats: selectedFood.fats * quantity,
+      quantity: quantity * 100,
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    try {
+      await api.post(endpoints.logFood, mealData);
+      fetchMacrosData();
+    } catch (error) {
+      console.error("Backend logging failed, falling back to local:", error);
+      const email = localStorage.getItem('currentUserEmail');
+      const logs = JSON.parse(localStorage.getItem(`foodLogs_${email}`) || '[]');
+      
+      logs.push({
+        name: selectedFood.name,
+        calories: selectedFood.calories,
+        protein: selectedFood.protein,
+        carbs: selectedFood.carbs,
+        fats: selectedFood.fats,
+        quantity: quantity,
+        unit: selectedFood.servingUnit,
+        timestamp: new Date().toISOString()
+      });
+      
+      localStorage.setItem(`foodLogs_${email}`, JSON.stringify(logs));
+      loadTodayLogs();
+    }
     
     setSelectedFood(null);
     setQuantity(1);
     setSearchQuery("");
-    loadTodayLogs();
+    window.dispatchEvent(new Event('storage'));
   };
 
-  const filteredFoods = foodDatabase.filter(food =>
-    food.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredFoods = searchFoods(searchQuery);
 
   const remainingCalories = targetCalories - todayCalories;
   const calorieProgress = Math.min((todayCalories / targetCalories) * 100, 100);
 
-  const suggestion = scannedFood ? getSuggestion(scannedFood) : null;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-red-50 to-orange-50 dark:bg-gray-900 pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 dark:from-pink-700 dark:to-orange-700 pt-8 pb-24 px-6 rounded-b-[2rem] shadow-xl">
-        <div className="flex items-center space-x-3 mb-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/10 rounded-xl transition"
-          >
-            <ArrowLeft className="w-6 h-6 text-white" />
-          </button>
-          <UtensilsCrossed className="w-8 h-8 text-white" />
-          <h1 className="text-2xl text-white font-semibold">Log Food</h1>
-        </div>
-        <p className="text-pink-50 ml-14">Track your meals with AI precision</p>
+    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 pb-24">
+      {/* Header with Background Container */}
+      <div className="bg-gradient-to-br from-pink-600 via-red-600 to-orange-600 dark:from-pink-800 dark:to-orange-900 pt-8 pb-6 px-6 rounded-b-[2rem] relative overflow-hidden">
+        <div className="relative z-10">
+            <button
+              onClick={() => navigate(-1)}
+              className="mb-4 p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all active:scale-95 text-white flex items-center space-x-2 group"
+            >
+              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+              <span className="font-bold text-xs uppercase tracking-widest">Back</span>
+            </button>
+            
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="max-w-xl">
+                <h1 className="text-3xl text-white font-bold tracking-tight mb-1">Log Food</h1>
+                <p className="text-pink-50 text-base font-medium opacity-90 leading-relaxed">
+                  Track your meals with AI precision and personalized health insights.
+                </p>
+              </div>
+              
+              <div className="hidden md:flex flex-col items-end">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner mb-2">
+                  <UtensilsCrossed className="w-8 h-8 text-white" />
+                </div>
+                <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">NutraGenius AI</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Decorative elements */}
+          <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-[-10%] left-[-5%] w-48 h-48 bg-black/5 rounded-full blur-2xl"></div>
       </div>
 
       {/* Today's Progress Card */}
-      <div className="px-6 -mt-16 mb-6">
+      <div className="px-6 mt-6 mb-8">
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-6 border-2 border-pink-100 dark:border-pink-900">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -343,7 +383,16 @@ export function FoodLoggingScreen() {
         {/* Scan and Upload Buttons - Side by Side */}
         <div className="grid grid-cols-2 gap-4">
           <button
-            onClick={() => setShowImageScan(true)}
+            onClick={() => {
+              // Trigger upload but simulate camera
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'image/*';
+              input.capture = 'environment';
+              input.onchange = (e: any) => handleImageUpload(e);
+              input.click();
+              setShowImageScan(true);
+            }}
             className="bg-gradient-to-br from-purple-500 via-purple-600 to-indigo-600 text-white rounded-2xl p-5 hover:shadow-2xl transition-all active:scale-95 flex flex-col items-center space-y-3 border-2 border-purple-400 shadow-lg"
           >
             <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
@@ -357,22 +406,13 @@ export function FoodLoggingScreen() {
 
           <button
             onClick={() => {
+              // Trigger file upload for gallery
               const input = document.createElement('input');
               input.type = 'file';
               input.accept = 'image/*';
-              input.onchange = (e: any) => {
-                const file = e.target?.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    setUploadedImage(reader.result as string);
-                    analyzeImage(reader.result as string);
-                    setShowImageScan(true);
-                  };
-                  reader.readAsDataURL(file);
-                }
-              };
+              input.onchange = (e: any) => handleImageUpload(e);
               input.click();
+              setShowImageScan(true);
             }}
             className="bg-gradient-to-br from-green-500 via-green-600 to-emerald-600 text-white rounded-2xl p-5 hover:shadow-2xl transition-all active:scale-95 flex flex-col items-center space-y-3 border-2 border-green-400 shadow-lg"
           >
@@ -418,7 +458,7 @@ export function FoodLoggingScreen() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-semibold text-gray-800 dark:text-white">{food.name}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{food.unit}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{food.servingSize} {food.servingUnit}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold bg-gradient-to-r from-pink-600 to-orange-600 bg-clip-text text-transparent">{food.calories}</p>
@@ -444,7 +484,7 @@ export function FoodLoggingScreen() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-800 dark:text-white text-lg">{selectedFood.name}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedFood.unit}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedFood.servingSize} {selectedFood.servingUnit}</p>
                 </div>
               </div>
               <button onClick={() => setSelectedFood(null)} className="text-gray-500 hover:text-red-500 p-2 hover:bg-white/50 rounded-lg transition">
@@ -481,7 +521,7 @@ export function FoodLoggingScreen() {
               </button>
               <div className="text-center">
                 <p className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 bg-clip-text text-transparent">{quantity}x</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{selectedFood.unit}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{selectedFood.servingSize} {selectedFood.servingUnit}</p>
               </div>
               <button
                 onClick={() => setQuantity(quantity + 0.5)}
@@ -511,8 +551,9 @@ export function FoodLoggingScreen() {
               <button
                 onClick={() => {
                   setShowImageScan(false);
-                  setScannedFood(null);
+                  setScannedNutrition(null);
                   setUploadedImage(null);
+                  setScanError(null);
                 }}
                 className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
               >
@@ -542,7 +583,7 @@ export function FoodLoggingScreen() {
                     <p className="text-lg font-medium text-gray-800 dark:text-white mb-2">Analyzing your food...</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">AI is detecting nutrition information</p>
                   </div>
-                ) : scannedFood ? (
+                ) : scannedNutrition ? (
                   <div className="space-y-4">
                     {/* Detection Result */}
                     <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800 rounded-2xl p-5">
@@ -550,10 +591,10 @@ export function FoodLoggingScreen() {
                         <div>
                           <div className="flex items-center space-x-2 mb-1">
                             <Sparkles className="w-5 h-5 text-green-600 dark:text-green-400" />
-                            <h3 className="text-xl font-bold text-gray-800 dark:text-white">{scannedFood.name}</h3>
+                            <h3 className="text-xl font-bold text-gray-800 dark:text-white">{scannedNutrition.name}</h3>
                           </div>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Confidence: {(scannedFood.confidence * 100).toFixed(0)}%
+                            Confidence: {(scannedNutrition.confidence * 100).toFixed(0)}%
                           </p>
                         </div>
                       </div>
@@ -563,76 +604,225 @@ export function FoodLoggingScreen() {
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
                           <p className="text-xs text-gray-500 dark:text-gray-400">Calories</p>
                           <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                            {Math.round(scannedFood.calories * scannedFood.quantity)}
+                            {Math.round(scannedNutrition.calories * scannedQuantity)}
                           </p>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
                           <p className="text-xs text-gray-500 dark:text-gray-400">Protein</p>
                           <p className="text-xl font-bold text-gray-800 dark:text-white">
-                            {Math.round(scannedFood.protein * scannedFood.quantity)}g
+                            {Math.round(scannedNutrition.protein * scannedQuantity)}g
                           </p>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
                           <p className="text-xs text-gray-500 dark:text-gray-400">Carbs</p>
                           <p className="text-xl font-bold text-gray-800 dark:text-white">
-                            {Math.round(scannedFood.carbs * scannedFood.quantity)}g
+                            {Math.round(scannedNutrition.carbs * scannedQuantity)}g
                           </p>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
                           <p className="text-xs text-gray-500 dark:text-gray-400">Fats</p>
                           <p className="text-xl font-bold text-gray-800 dark:text-white">
-                            {Math.round(scannedFood.fats * scannedFood.quantity)}g
+                            {Math.round(scannedNutrition.fats * scannedQuantity)}g
                           </p>
                         </div>
                       </div>
 
-                      {/* AI Suggestion */}
-                      {suggestion && (
-                        <div className={`border-2 rounded-xl p-4 ${
-                          suggestion.type === 'decrease' 
-                            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-800' 
-                            : suggestion.type === 'increase'
-                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-800'
-                            : 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-800'
-                        }`}>
-                          <div className="flex items-start space-x-3">
-                            {suggestion.type === 'decrease' ? (
-                              <TrendingDown className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-1" />
-                            ) : suggestion.type === 'increase' ? (
-                              <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
-                            ) : (
-                              <Check className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-1" />
-                            )}
-                            <div>
-                              <p className={`font-semibold mb-1 ${
-                                suggestion.type === 'decrease' 
-                                  ? 'text-red-900 dark:text-red-300' 
-                                  : suggestion.type === 'increase'
-                                  ? 'text-blue-900 dark:text-blue-300'
-                                  : 'text-green-900 dark:text-green-300'
-                              }`}>
-                                {suggestion.message}
-                              </p>
-                              <p className="text-sm text-gray-700 dark:text-gray-300">{suggestion.reason}</p>
+                      {/* Detailed Micronutrients & Macronutrients */}
+                      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-4">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <Info className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                          <h4 className="font-semibold text-gray-800 dark:text-white">Complete Nutrient Breakdown</h4>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {/* Macronutrients Section */}
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mb-2">Macronutrients</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Fiber</p>
+                                <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.fiber || 0) * scannedQuantity).toFixed(1)}g</p>
+                              </div>
+                              {scannedNutrition.sugar !== undefined && (
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Sugar</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.sugar || 0) * scannedQuantity).toFixed(1)}g</p>
+                                </div>
+                              )}
+                              {scannedNutrition.saturatedFat !== undefined && (
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Saturated Fat</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.saturatedFat || 0) * scannedQuantity).toFixed(1)}g</p>
+                                </div>
+                              )}
+                              {scannedNutrition.cholesterol !== undefined && (
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">Cholesterol</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.cholesterol || 0) * scannedQuantity).toFixed(0)}mg</p>
+                                </div>
+                              )}
                             </div>
                           </div>
+
+                          {/* Vitamins Section */}
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mb-2">Vitamins</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {scannedNutrition.vitaminA !== undefined && (
+                                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-orange-700 dark:text-orange-400">Vitamin A</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminA || 0) * scannedQuantity).toFixed(0)}mcg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.vitaminC !== undefined && (
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-yellow-700 dark:text-yellow-400">Vitamin C</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminC || 0) * scannedQuantity).toFixed(1)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.vitaminD !== undefined && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-blue-700 dark:text-blue-400">Vitamin D</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminD || 0) * scannedQuantity).toFixed(1)}mcg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.vitaminE !== undefined && (
+                                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-green-700 dark:text-green-400">Vitamin E</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminE || 0) * scannedQuantity).toFixed(1)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.vitaminK !== undefined && (
+                                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-purple-700 dark:text-purple-400">Vitamin K</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminK || 0) * scannedQuantity).toFixed(0)}mcg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.vitaminB12 !== undefined && (
+                                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-red-700 dark:text-red-400">Vitamin B12</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.vitaminB12 || 0) * scannedQuantity).toFixed(1)}mcg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.folate !== undefined && (
+                                <div className="bg-pink-50 dark:bg-pink-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-pink-700 dark:text-pink-400">Folate</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.folate || 0) * scannedQuantity).toFixed(0)}mcg</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Minerals Section */}
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase mb-2">Minerals</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {scannedNutrition.calcium !== undefined && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-blue-700 dark:text-blue-400">Calcium</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.calcium || 0) * scannedQuantity).toFixed(0)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.iron !== undefined && (
+                                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-red-700 dark:text-red-400">Iron</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.iron || 0) * scannedQuantity).toFixed(1)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.magnesium !== undefined && (
+                                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-green-700 dark:text-green-400">Magnesium</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.magnesium || 0) * scannedQuantity).toFixed(0)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.potassium !== undefined && (
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-yellow-700 dark:text-yellow-400">Potassium</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.potassium || 0) * scannedQuantity).toFixed(0)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.sodium !== undefined && (
+                                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-orange-700 dark:text-orange-400">Sodium</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.sodium || 0) * scannedQuantity).toFixed(0)}mg</p>
+                                </div>
+                              )}
+                              {scannedNutrition.zinc !== undefined && (
+                                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
+                                  <p className="text-xs text-purple-700 dark:text-purple-400">Zinc</p>
+                                  <p className="font-semibold text-gray-800 dark:text-white">{((scannedNutrition.zinc || 0) * scannedQuantity).toFixed(1)}mg</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AI Suggestions */}
+                      {suggestions.length > 0 && (
+                        <div className="space-y-3 mb-4">
+                          <h4 className="font-semibold text-gray-800 dark:text-white flex items-center space-x-2">
+                            <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                            <span>AI Health Recommendations</span>
+                          </h4>
+                          {suggestions.map((suggestion, index) => (
+                            <div key={index} className={`border-2 rounded-xl p-4 ${
+                              suggestion.type === 'decrease' || suggestion.type === 'remove'
+                                ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-800' 
+                                : suggestion.type === 'increase' || suggestion.type === 'add'
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-800'
+                                : 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-800'
+                            }`}>
+                              <div className="flex items-start space-x-3">
+                                <span className="text-2xl flex-shrink-0">{suggestion.icon}</span>
+                                <div>
+                                  <p className={`font-semibold mb-1 ${
+                                    suggestion.type === 'decrease' || suggestion.type === 'remove'
+                                      ? 'text-red-900 dark:text-red-300' 
+                                      : suggestion.type === 'increase' || suggestion.type === 'add'
+                                      ? 'text-blue-900 dark:text-blue-300'
+                                      : 'text-green-900 dark:text-green-300'
+                                  }`}>
+                                    {suggestion.title}
+                                  </p>
+                                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-1">({suggestion.message})</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{suggestion.reason}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Alternative Recommendations */}
+                      {alternatives.length > 0 && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-4">
+                          <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-3">💡 Healthier Alternatives</h4>
+                          <ul className="space-y-2">
+                            {alternatives.map((alt, index) => (
+                              <li key={index} className="flex items-start space-x-2">
+                                <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">{alt}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
 
                       {/* Quantity Adjuster */}
                       <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl p-4 mt-4">
                         <button
-                          onClick={() => setScannedFood({...scannedFood, quantity: Math.max(0.3, scannedFood.quantity - 0.1)})}
+                          onClick={() => setScannedQuantity(Math.max(0.3, scannedQuantity - 0.1))}
                           className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                         >
                           <Minus className="w-5 h-5 text-gray-700 dark:text-white" />
                         </button>
                         <div className="text-center">
-                          <p className="text-2xl font-bold text-gray-800 dark:text-white">{scannedFood.quantity.toFixed(1)}x</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{scannedFood.unit}</p>
+                          <p className="text-2xl font-bold text-gray-800 dark:text-white">{scannedQuantity.toFixed(1)}x</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{scannedNutrition.servingSize}</p>
                         </div>
                         <button
-                          onClick={() => setScannedFood({...scannedFood, quantity: scannedFood.quantity + 0.1})}
+                          onClick={() => setScannedQuantity(scannedQuantity + 0.1)}
                           className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center hover:bg-purple-600 transition"
                         >
                           <Plus className="w-5 h-5 text-white" />
@@ -644,7 +834,7 @@ export function FoodLoggingScreen() {
                     <div className="flex space-x-3">
                       <button
                         onClick={() => {
-                          setScannedFood(null);
+                          setScannedNutrition(null);
                           setUploadedImage(null);
                         }}
                         className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition"
@@ -659,6 +849,23 @@ export function FoodLoggingScreen() {
                         <span className="font-medium">Log This Food</span>
                       </button>
                     </div>
+                  </div>
+                ) : scanError ? (
+                  <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-2xl p-8 text-center space-y-4">
+                    <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+                    <div>
+                      <p className="text-lg font-medium text-gray-800 dark:text-white mb-1">Scanning Failed</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">{scanError}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setUploadedImage(null);
+                        setScanError(null);
+                      }}
+                      className="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                    >
+                      Try Another Photo
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -825,6 +1032,7 @@ export function FoodLoggingScreen() {
                       setManualFood({ name: "", quantity: "", unit: "g" });
                       setNutritionInfo(null);
                       loadTodayLogs();
+                      window.dispatchEvent(new Event('storage'));
                     }}
                     className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg transition flex items-center justify-center space-x-2"
                   >

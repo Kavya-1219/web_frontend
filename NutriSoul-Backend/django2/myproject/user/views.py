@@ -373,7 +373,10 @@ class ResetPasswordView(APIView):
             if not otp_obj or otp_obj.is_expired():
                 return Response({"error": "Invalid or expired OTP."}, status=status.HTTP_400_BAD_REQUEST)
             
-            user = User.objects.get(email=email)
+            user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            
             user.set_password(new_password)
             user.save()
             
@@ -388,12 +391,13 @@ class RegisterView(APIView):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
+            token, created = Token.objects.get_or_create(user=user)
             return Response({
-                "message": "User registered successfully",
-                "user": {
-                    "username": user.username,
-                    "email": user.email
-                }
+                "token": token.key,
+                "user_id": user.pk,
+                "email": user.email,
+                "username": user.username,
+                "message": "User registered successfully"
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

@@ -16,6 +16,7 @@ import {
   Utensils
 } from "lucide-react";
 import { getUserProfile } from "@/app/helpers/meal-plan-helper";
+import api, { endpoints } from "../helpers/api";
 
 interface LoggedFood {
   name: string;
@@ -43,23 +44,89 @@ export function HomeDashboard() {
   const [greeting, setGreeting] = useState("Good Morning");
   const [todayWater, setTodayWater] = useState(0);
   const [todaySteps, setTodaySteps] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadUserData();
-    loadTrackingData();
+    const initDashboard = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        fetchHomeData(),
+        fetchMacrosData(),
+        fetchWaterData(),
+        fetchStepsData()
+      ]);
+      setIsLoading(false);
+    };
+
+    initDashboard();
     setGreetingBasedOnTime();
 
     const handleStorageChange = () => {
-      const email = localStorage.getItem('currentUserEmail');
-      if (email) {
-        const savedProfilePicture = localStorage.getItem(`profilePicture_${email}`);
-        setProfilePicture(savedProfilePicture);
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setProfilePicture(user.profile_picture || null);
       }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  const fetchHomeData = async () => {
+    try {
+      const response = await api.get(endpoints.home);
+      if (response.data) {
+        const profile = response.data;
+        setUserName(profile.full_name || 'User');
+        setTargetCalories(profile.daily_calorie_goal || 2000);
+        setWeeklyProgress({
+          currentWeight: profile.weight || 0,
+          targetWeight: profile.target_weight || 0,
+          startWeight: profile.weight || 0, // Simplified
+          weeksPassed: 0 // Would need timeline calculation
+        });
+      }
+    } catch (error) {
+      console.error("Home data fetch failed:", error);
+      // Fallback
+      const personalDetails = JSON.parse(localStorage.getItem('personalDetails') || '{}');
+      setUserName(personalDetails.name || 'User');
+    }
+  };
+
+  const fetchMacrosData = async () => {
+    try {
+      const response = await api.get("/today-macros/");
+      if (response.data) {
+        setTodayCalories(Math.round(response.data.calories || 0));
+      }
+    } catch (error) {
+       console.error("Macros fetch failed:", error);
+    }
+  };
+
+  const fetchWaterData = async () => {
+    try {
+      const response = await api.get(endpoints.waterTracking);
+      if (response.data) {
+        setTodayWater(response.data.todays_water_intake || 0);
+      }
+    } catch (error) {
+       console.error("Water fetch failed:", error);
+    }
+  };
+
+  const fetchStepsData = async () => {
+    try {
+      const response = await api.get("/steps/today/");
+      if (response.data) {
+        setTodaySteps(response.data.total_steps || 0);
+      }
+    } catch (error) {
+       console.error("Steps fetch failed:", error);
+    }
+  };
 
   const setGreetingBasedOnTime = () => {
     const hour = new Date().getHours();
@@ -137,11 +204,11 @@ export function HomeDashboard() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] dark:bg-gray-950 pb-24">
       {/* Premium Header */}
-      <div className="bg-gradient-to-br from-[#22C55E] to-[#16A34A] pt-12 pb-24 px-6 rounded-b-[2.5rem] shadow-lg relative overflow-hidden">
-        <div className="max-w-4xl mx-auto flex items-center justify-between relative z-10">
+      <div className="bg-gradient-to-br from-[#22C55E] to-[#16A34A] pt-8 pb-6 px-6 rounded-b-[2rem] relative overflow-hidden">
+        <div className="flex items-center justify-between relative z-10">
           <div>
-            <p className="text-white/80 text-sm font-medium tracking-wide uppercase">{greeting}</p>
-            <h1 className="text-4xl text-white font-extrabold tracking-tight mt-1">{userName}</h1>
+            <p className="text-white text-base font-medium opacity-90 tracking-wide uppercase">{greeting}</p>
+            <h1 className="text-3xl text-white font-bold tracking-tight mt-1">{userName}</h1>
           </div>
           <button 
             onClick={() => navigate("/app/profile")}
@@ -158,7 +225,7 @@ export function HomeDashboard() {
         <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 -mt-16 space-y-8">
+      <div className="px-6 mt-6 space-y-8">
         {/* Calorie Goal Card */}
         <div className="bg-white dark:bg-gray-900 rounded-[2rem] shadow-2xl p-8 border border-gray-100 dark:border-gray-800 transform transition-all duration-500 hover:shadow-emerald-100 dark:hover:shadow-none animate-fade-in">
           <div className="flex items-center justify-between mb-8">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Droplets, Plus, Minus, Target, TrendingUp, Calendar, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router";
+import api, { endpoints } from "../helpers/api";
 
 interface WaterLog {
   amount: number;
@@ -12,17 +13,35 @@ export function WaterTrackingScreen() {
   const [targetWater, setTargetWater] = useState(2000);
   const [glassSize, setGlassSize] = useState(250);
   const [weeklyAverage, setWeeklyAverage] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    calculateTarget();
-    loadTodayWater();
-    calculateWeeklyAverage();
+    fetchWaterData();
   }, []);
+
+  const fetchWaterData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get(endpoints.waterTracking);
+      if (response.data) {
+        setTodayWater(response.data.todays_water_intake || 0);
+        setTargetWater(response.data.daily_water_goal || 2000);
+        // Calculate weekly avg from results if available in future
+      }
+    } catch (error) {
+      console.error("Water fetch failed:", error);
+      calculateTarget();
+      loadTodayWater();
+    } finally {
+      setIsLoading(false);
+    }
+    calculateWeeklyAverage();
+  };
 
   const calculateTarget = () => {
     const bodyDetails = JSON.parse(localStorage.getItem('bodyDetails') || '{}');
     const weight = parseFloat(bodyDetails.weight) || 70;
-    const target = Math.round(weight * 35); // 35ml per kg
+    const target = Math.round(weight * 35);
     setTargetWater(target);
   };
 
@@ -30,11 +49,7 @@ export function WaterTrackingScreen() {
     const today = new Date().toDateString();
     const email = localStorage.getItem('currentUserEmail');
     const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    
-    const todayLogs = logs.filter((log: WaterLog) => 
-      new Date(log.timestamp).toDateString() === today
-    );
-    
+    const todayLogs = logs.filter((log: WaterLog) => new Date(log.timestamp).toDateString() === today);
     const total = todayLogs.reduce((sum: number, log: WaterLog) => sum + log.amount, 0);
     setTodayWater(total);
   };
@@ -42,57 +57,58 @@ export function WaterTrackingScreen() {
   const calculateWeeklyAverage = () => {
     const email = localStorage.getItem('currentUserEmail');
     const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const weekLogs = logs.filter((log: WaterLog) => 
-      new Date(log.timestamp) >= sevenDaysAgo
-    );
-    
-    // Group by date
+    const weekLogs = logs.filter((log: WaterLog) => new Date(log.timestamp) >= sevenDaysAgo);
     const dailyTotals: { [key: string]: number } = {};
     weekLogs.forEach((log: WaterLog) => {
       const date = new Date(log.timestamp).toDateString();
       dailyTotals[date] = (dailyTotals[date] || 0) + log.amount;
     });
-    
     const days = Object.keys(dailyTotals).length;
     const total = Object.values(dailyTotals).reduce((sum, amount) => sum + amount, 0);
     setWeeklyAverage(days > 0 ? Math.round(total / days) : 0);
   };
 
-  const addWater = (amount: number) => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    
-    logs.push({
-      amount,
-      timestamp: new Date().toISOString()
-    });
-    
-    localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
-    setTodayWater(prev => prev + amount);
+  const addWater = async (amount: number) => {
+    try {
+      const response = await api.post(endpoints.waterTracking, { water_amount: amount });
+      if (response.data) {
+        setTodayWater(response.data.todays_water_intake);
+      }
+    } catch (error) {
+      console.error("Backend add water failed, falling back to local:", error);
+      const email = localStorage.getItem('currentUserEmail');
+      const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
+      logs.push({ amount, timestamp: new Date().toISOString() });
+      localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
+      setTodayWater(prev => prev + amount);
+    }
     calculateWeeklyAverage();
   };
 
-  const removeWater = () => {
+  const removeWater = async () => {
     if (todayWater >= glassSize) {
-      const email = localStorage.getItem('currentUserEmail');
-      const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-      const today = new Date().toDateString();
-      
-      // Find and remove the most recent log from today
-      for (let i = logs.length - 1; i >= 0; i--) {
-        if (new Date(logs[i].timestamp).toDateString() === today) {
-          logs.splice(i, 1);
-          break;
+      try {
+        // Assuming backend has a remove endpoint or we just post negative
+        // For now, let's just do local logic if backend doesn't support undo directly via POST
+        // Backend view for water-tracking only has GET and POST (add)
+        // So we might need a DELETE or just keep local for undo
+        const email = localStorage.getItem('currentUserEmail');
+        const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
+        const today = new Date().toDateString();
+        for (let i = logs.length - 1; i >= 0; i--) {
+          if (new Date(logs[i].timestamp).toDateString() === today) {
+            logs.splice(i, 1);
+            break;
+          }
         }
+        localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
+        setTodayWater(prev => Math.max(0, prev - glassSize));
+        calculateWeeklyAverage();
+      } catch (error) {
+        console.error("Remove water failed:", error);
       }
-      
-      localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
-      setTodayWater(prev => Math.max(0, prev - glassSize));
-      calculateWeeklyAverage();
     }
   };
 
@@ -115,12 +131,14 @@ export function WaterTrackingScreen() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-gray-900 dark:to-blue-900/20 pb-24">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 dark:from-blue-700 dark:to-cyan-700 pt-8 pb-20 px-6 rounded-b-[2rem]">
-        <div className="flex items-center space-x-3 mb-3">
-          <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
-          <Droplets className="w-8 h-8 text-white" />
-          <h1 className="text-2xl text-white font-semibold">Water Tracking</h1>
+        <div>
+          <div className="flex items-center space-x-3 mb-3">
+            <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
+            <Droplets className="w-8 h-8 text-white" />
+            <h1 className="text-2xl text-white font-semibold">Water Tracking</h1>
+          </div>
+          <p className="text-blue-50">Stay hydrated, stay healthy!</p>
         </div>
-        <p className="text-blue-50">Stay hydrated, stay healthy!</p>
       </div>
 
       {/* Main Card */}
@@ -259,13 +277,13 @@ export function WaterTrackingScreen() {
             <li className="flex items-start space-x-3">
               <span className="text-blue-500 mt-0.5">💧</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Boosts metabolism</strong> - Helps burn more calories
+                <strong>Supports metabolism</strong> - Helps maintain healthy metabolic function
               </p>
             </li>
             <li className="flex items-start space-x-3">
               <span className="text-blue-500 mt-0.5">💧</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Reduces appetite</strong> - Helps with weight management
+                <strong>Reduces appetite</strong> - Can help reduce hunger and support weight management
               </p>
             </li>
             <li className="flex items-start space-x-3">
@@ -277,10 +295,21 @@ export function WaterTrackingScreen() {
             <li className="flex items-start space-x-3">
               <span className="text-blue-500 mt-0.5">💧</span>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Better digestion</strong> - Aids nutrient absorption
+                <strong>Better digestion</strong> - Aids nutrient absorption and digestion
+              </p>
+            </li>
+            <li className="flex items-start space-x-3">
+              <span className="text-blue-500 mt-0.5">💧</span>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                <strong>Energy boost</strong> - Prevents fatigue and improves focus
               </p>
             </li>
           </ul>
+          <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+            <p className="text-xs text-blue-700 dark:text-blue-300 italic">
+              💡 Note: Water doesn't directly burn calories, but staying hydrated supports overall health and weight management.
+            </p>
+          </div>
         </div>
       </div>
     </div>

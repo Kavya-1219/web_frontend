@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, Edit2, Save, X, Plus, Minus, Info, Sparkles, AlertCircle, CheckCircle, Circle } from "lucide-react";
+import { useNavigate } from "react-router";
+import { ArrowLeft, RefreshCw, Edit2, Save, X, Plus, Minus, Info, Sparkles, AlertCircle, CheckCircle, Circle } from "lucide-react";
 import { generateMealPlan, getUserProfile, getHealthRecommendations } from "@/app/helpers/meal-plan-helper";
+import api, { endpoints } from "../helpers/api";
 
 interface MealItem {
   name: string;
@@ -23,25 +25,96 @@ interface Meal {
 }
 
 export function MealPlanScreen() {
+  const navigate = useNavigate();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [editingMealIndex, setEditingMealIndex] = useState<number | null>(null);
   const [editedMeal, setEditedMeal] = useState<Meal | null>(null);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [consumedMeals, setConsumedMeals] = useState<Set<number>>(new Set());
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     loadMealPlan();
     loadConsumedMeals();
   }, []);
 
-  const loadMealPlan = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const saved = localStorage.getItem(`mealPlan_${email}`);
-    
-    if (saved) {
-      setMeals(JSON.parse(saved));
-    } else {
-      generateNewMealPlan();
+  const loadMealPlan = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get(endpoints.mealPlan);
+      if (response.data && response.data.meals) {
+        // Map backend response to frontend Meal interface
+        const mappedMeals = response.data.meals.map((m: any) => ({
+          name: m.name,
+          calories: m.calories,
+          protein: m.protein,
+          carbs: m.carbs,
+          fats: m.fats,
+          fiber: m.fiber || 0,
+          mealType: m.meal_type || m.mealType,
+          items: m.items.map((i: any) => ({
+            name: i.name,
+            quantity: i.quantity,
+            calories: i.calories,
+            protein: i.protein,
+            carbs: i.carbs,
+            fats: i.fats,
+          }))
+        }));
+        setMeals(mappedMeals);
+      } else {
+        throw new Error("Empty meal plan from server");
+      }
+    } catch (error) {
+      console.error("Failed to fetch meal plan from backend, using local:", error);
+      const email = localStorage.getItem('currentUserEmail');
+      const saved = localStorage.getItem(`mealPlan_${email}`);
+      if (saved) {
+        setMeals(JSON.parse(saved));
+      } else {
+        generateNewMealPlan();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateNewMealPlan = async () => {
+    setIsLoading(true);
+    try {
+      // POST to refresh the plan
+      const response = await api.post(endpoints.mealPlan);
+      if (response.data && response.data.meals) {
+         const mappedMeals = response.data.meals.map((m: any) => ({
+          name: m.name,
+          calories: m.calories,
+          protein: m.protein,
+          carbs: m.carbs,
+          fats: m.fats,
+          fiber: m.fiber || 0,
+          mealType: m.meal_type || m.mealType,
+          items: m.items.map((i: any) => ({
+            name: i.name,
+            quantity: i.quantity,
+            calories: i.calories,
+            protein: i.protein,
+            carbs: i.carbs,
+            fats: i.fats,
+          }))
+        }));
+        setMeals(mappedMeals);
+        const email = localStorage.getItem('currentUserEmail');
+        localStorage.setItem(`mealPlan_${email}`, JSON.stringify(mappedMeals));
+      }
+    } catch (error) {
+      console.error("Failed to generate new meal plan:", error);
+      const mealsPerDay = parseInt(localStorage.getItem('mealsPerDay') || '4');
+      const newMeals = generateMealPlan(mealsPerDay);
+      setMeals(newMeals);
+      const email = localStorage.getItem('currentUserEmail');
+      localStorage.setItem(`mealPlan_${email}`, JSON.stringify(newMeals));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -52,16 +125,6 @@ export function MealPlanScreen() {
     if (saved) {
       setConsumedMeals(new Set(JSON.parse(saved)));
     }
-  };
-
-  const generateNewMealPlan = () => {
-    const mealsPerDay = parseInt(localStorage.getItem('mealsPerDay') || '4');
-    const newMeals = generateMealPlan(mealsPerDay);
-    setMeals(newMeals);
-    
-    // Save to localStorage
-    const email = localStorage.getItem('currentUserEmail');
-    localStorage.setItem(`mealPlan_${email}`, JSON.stringify(newMeals));
   };
 
   const toggleMealConsumed = (mealIndex: number) => {
@@ -267,135 +330,168 @@ export function MealPlanScreen() {
   };
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 pt-8 pb-32 px-6 rounded-[2rem] shadow-lg relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-end md:justify-between max-w-5xl mx-auto">
-          <div className="mb-4 md:mb-0">
-            <h1 className="text-4xl text-white font-black tracking-tight mb-2">Today's Meal Plan</h1>
-            <div className="flex flex-wrap gap-3">
-              <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-semibold">
-                🔥 Plan: {Math.round(totalNutrition.calories)} kcal
-              </span>
-              <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-semibold">
-                ✅ Consumed: {Math.round(consumedNutrition.calories)} kcal
-              </span>
-              <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-white text-sm font-semibold">
-                {consumedMeals.size} of {meals.length} meals eaten
-              </span>
-            </div>
-          </div>
-          <button 
-            onClick={generateNewMealPlan}
-            className="self-start md:self-auto bg-white/20 hover:bg-white/30 backdrop-blur-md px-6 py-3 rounded-2xl flex items-center space-x-2 text-white font-bold transition-all hover:scale-105 active:scale-95"
+    <div className="min-h-screen pb-24 bg-gray-50/50">
+          <div className="bg-gradient-to-r from-green-600 to-green-700 pt-8 pb-6 px-6 rounded-b-[2rem] relative overflow-hidden">
+        <div className="w-full relative z-10">
+          <button
+            onClick={() => navigate("/app")}
+            className="mb-4 p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all active:scale-95 text-white flex items-center space-x-2 group"
           >
-            <RefreshCw className="w-5 h-5" />
-            <span>Generate New</span>
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-bold text-xs uppercase tracking-widest">Back</span>
           </button>
+          
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+            <div>
+              <h1 className="text-3xl text-white font-bold tracking-tight mb-4">Today's Meal Plan</h1>
+              <div className="flex flex-wrap gap-4">
+                <div className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-[1.5rem] border border-white/20 shadow-inner flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-green-100 opacity-70">Target</span>
+                  <span className="text-xl font-black text-white">{Math.round(totalNutrition.calories)} <span className="text-sm font-bold opacity-70">kcal</span></span>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-[1.5rem] border border-white/20 shadow-inner flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-green-100 opacity-70">Consumed</span>
+                  <span className="text-xl font-black text-white">{Math.round(consumedNutrition.calories)} <span className="text-sm font-bold opacity-70">kcal</span></span>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md px-6 py-2.5 rounded-[1.5rem] border border-white/20 shadow-inner flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-green-100 opacity-70">Progress</span>
+                  <span className="text-xl font-black text-white">{consumedMeals.size} / {meals.length} <span className="text-sm font-bold opacity-70">Meals</span></span>
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={generateNewMealPlan}
+              className="group bg-white text-green-700 hover:bg-green-50 px-8 py-5 rounded-3xl flex items-center space-x-3 font-black transition-all shadow-2xl shadow-black/10 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <RefreshCw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
+              <span className="text-lg">Generate New Plan</span>
+            </button>
+          </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+        
+        {/* Decorative elements */}
+        <div className="absolute top-[-20%] right-[-10%] w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-[-20%] left-[-10%] w-64 h-64 bg-black/5 rounded-full blur-2xl"></div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 -mt-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="px-6 mt-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Main Feed */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="lg:col-span-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {meals.map((meal, index) => {
                 const isEditing = editingMealIndex === index;
                 const displayMeal = isEditing && editedMeal ? editedMeal : meal;
                 const isConsumed = consumedMeals.has(index);
 
                 return (
-                  <div key={index} className={`bg-white dark:bg-gray-800 rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition-shadow border ${isConsumed ? 'border-green-400 ring-2 ring-green-400' : 'border-gray-100 dark:border-gray-700'}`}>
+                  <div key={index} className={`bg-white rounded-[2.5rem] shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300 border-2 ${isConsumed ? 'border-green-500 scale-[1.02]' : 'border-transparent'}`}>
                     {/* Meal Header */}
-                    <div className="p-6 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-center shadow-sm text-2xl">
-                          {getMealIcon(meal.mealType)}
+                    <div className="p-8 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-md text-3xl">
+                          {getMealIcon(displayMeal.mealType)}
                         </div>
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white capitalize">{meal.mealType}</h3>
+                        <div>
+                          <h3 className="text-xl font-black text-gray-800 tracking-tight capitalize">{displayMeal.mealType}</h3>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{displayMeal.items.length} Items</p>
+                        </div>
                       </div>
                       {!isEditing ? (
-                        <button onClick={() => handleEditMeal(index)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition">
-                          <Edit2 className="w-5 h-5" />
+                        <button 
+                          onClick={() => handleEditMeal(index)} 
+                          className="p-3 text-blue-500 hover:bg-blue-50 rounded-2xl transition-all active:scale-90"
+                        >
+                          <Edit2 className="w-6 h-6" />
                         </button>
                       ) : (
-                        <div className="flex space-x-1">
-                          <button onClick={handleCancelEdit} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition"><X className="w-5 h-5" /></button>
-                          <button onClick={handleSaveMeal} className="p-2 text-green-600 hover:bg-green-50 rounded-xl transition"><Save className="w-5 h-5" /></button>
+                        <div className="flex items-center space-x-2">
+                          <button onClick={handleCancelEdit} className="p-3 text-red-400 hover:bg-red-50 rounded-2xl transition-all active:scale-90"><X className="w-6 h-6" /></button>
+                          <button onClick={handleSaveMeal} className="p-3 text-green-500 hover:bg-green-50 rounded-2xl transition-all active:scale-90"><Save className="w-6 h-6" /></button>
                         </div>
                       )}
                     </div>
 
-                    <div className="p-6">
-                      <h4 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4">{displayMeal.name}</h4>
+                    <div className="p-8 space-y-8">
+                      <h4 className="text-2xl font-black text-gray-800 tracking-tight leading-tight">{displayMeal.name}</h4>
 
-                      {/* Mark as Eaten Button */}
+                      {/* Nutrition Micro Grid */}
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="bg-gray-50 rounded-2xl p-4 flex flex-col items-center border border-gray-100">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Cals</span>
+                          <span className="text-lg font-black text-gray-800">{Math.round(displayMeal.calories)}</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl p-4 flex flex-col items-center border border-gray-100">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Prot</span>
+                          <span className="text-lg font-black text-gray-800">{Math.round(displayMeal.protein)}g</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl p-4 flex flex-col items-center border border-gray-100">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Carb</span>
+                          <span className="text-lg font-black text-gray-800">{Math.round(displayMeal.carbs)}g</span>
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl p-4 flex flex-col items-center border border-gray-100">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Fat</span>
+                          <span className="text-lg font-black text-gray-800">{Math.round(displayMeal.fats)}g</span>
+                        </div>
+                      </div>
+
+                      {/* Consumed States */}
                       <button
                         onClick={() => toggleMealConsumed(index)}
-                        className={`w-full py-2.5 px-4 rounded-xl font-medium transition-all mb-4 flex items-center justify-center space-x-2 ${
+                        className={`w-full py-5 rounded-[1.75rem] font-black text-lg transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${
                           isConsumed
-                            ? 'bg-green-500 hover:bg-green-600 text-white'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-2 border-gray-300'
+                            ? 'bg-green-500 text-white shadow-xl shadow-green-100'
+                            : 'bg-white text-gray-400 border-2 border-dashed border-gray-200 hover:border-green-300 hover:text-green-500'
                         }`}
                       >
                         {isConsumed ? (
                           <>
-                            <CheckCircle className="w-5 h-5" />
-                            <span>Meal Consumed ✓</span>
+                            <CheckCircle className="w-6 h-6 animate-spring" />
+                            <span>Plan Executed</span>
                           </>
                         ) : (
                           <>
-                            <Circle className="w-5 h-5" />
-                            <span>Mark as Eaten</span>
+                            <Circle className="w-6 h-6 opacity-30" />
+                            <span>Mark as Consumed</span>
                           </>
                         )}
                       </button>
-                      
-                      {/* Nutrition Grid */}
-                      <div className="grid grid-cols-4 gap-2 mb-6">
-                        <div className="bg-green-50/50 rounded-xl p-2 text-center border border-green-100">
-                          <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Cals</p>
-                          <p className="text-sm font-black text-green-700">{Math.round(displayMeal.calories)}</p>
-                        </div>
-                        <div className="bg-blue-50/50 rounded-xl p-2 text-center border border-blue-100">
-                          <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Prot</p>
-                          <p className="text-sm font-black text-blue-700">{Math.round(displayMeal.protein)}g</p>
-                        </div>
-                        <div className="bg-orange-50/50 rounded-xl p-2 text-center border border-orange-100">
-                          <p className="text-[10px] text-orange-600 font-bold uppercase tracking-wider">Carb</p>
-                          <p className="text-sm font-black text-orange-700">{Math.round(displayMeal.carbs)}g</p>
-                        </div>
-                        <div className="bg-amber-50/50 rounded-xl p-2 text-center border border-amber-100">
-                          <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">Fat</p>
-                          <p className="text-sm font-black text-amber-700">{Math.round(displayMeal.fats)}g</p>
-                        </div>
-                      </div>
 
-                      {/* Items */}
+                      {/* Items Details */}
                       <div className="space-y-4">
+                        <h5 className="text-xs font-black text-gray-300 uppercase tracking-[0.2em] border-b border-gray-50 pb-2">Ingredients / Items</h5>
                         {displayMeal.items.map((item, itemIndex) => (
-                          <div key={itemIndex} className="flex items-center justify-between p-3 bg-gray-50/50 dark:bg-gray-900/30 rounded-2xl">
+                          <div key={itemIndex} className="group/item flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                             <div className="flex-1">
-                              <p className="font-bold text-gray-800 dark:text-white text-sm">{item.name}</p>
+                              <p className="font-bold text-gray-700 group-hover/item:text-green-600 transition-colors uppercase tracking-tight">{item.name}</p>
                               {isEditing ? (
-                                <div className="flex items-center space-x-2 mt-2">
-                                  <input
-                                    type="number"
-                                    value={parseFloat(item.quantity) || ''}
-                                    onChange={(e) => updateItemQuantity(itemIndex, e.target.value)}
-                                    className="w-16 px-2 py-1 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                                  />
-                                  <span className="text-[10px] font-bold text-gray-400">{item.quantity.replace(/[0-9.]/g, '').trim()}</span>
-                                  <button onClick={() => removeItem(itemIndex)} className="text-red-400 hover:text-red-600"><Minus className="w-4 h-4" /></button>
+                                <div className="flex items-center space-x-3 mt-3">
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      value={parseFloat(item.quantity) || ''}
+                                      onChange={(e) => updateItemQuantity(itemIndex, e.target.value)}
+                                      className="w-20 px-4 py-2 bg-gray-50 rounded-xl font-black text-sm focus:ring-2 focus:ring-green-500 focus:outline-none"
+                                    />
+                                    <span className="absolute right-[-2.5rem] top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400 uppercase">
+                                      {item.quantity.replace(/[0-9.]/g, '').trim()}
+                                    </span>
+                                  </div>
+                                  <button 
+                                    onClick={() => removeItem(itemIndex)} 
+                                    className="p-2 text-red-300 hover:text-red-500 transition-colors"
+                                  >
+                                    <Minus className="w-5 h-5" />
+                                  </button>
                                 </div>
                               ) : (
-                                <p className="text-xs font-bold text-green-600">{item.quantity}</p>
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1 group-hover/item:text-green-400 transition-colors">{item.quantity}</p>
                               )}
                             </div>
                             <div className="text-right">
-                              <p className="font-black text-gray-800 dark:text-white text-sm">{item.calories} <span className="text-[10px] font-bold text-gray-400">kcal</span></p>
+                              <span className="text-lg font-black text-gray-800 tracking-tighter">{item.calories}</span>
+                              <span className="ml-1 text-[10px] font-black text-gray-300 uppercase">kcal</span>
                             </div>
                           </div>
                         ))}
@@ -407,53 +503,86 @@ export function MealPlanScreen() {
             </div>
           </div>
 
-          {/* Sidebar / Stats */}
-          <div className="space-y-8">
-             {/* Target Box */}
-             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8 border border-white/20">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Daily Target</h2>
-              <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl mb-4">
-                <span className="text-green-800 dark:text-green-300 font-bold">Recommended</span>
-                <span className="text-xl font-black text-green-600">{profile.targetCalories} <span className="text-sm">kcal</span></span>
+          {/* Sidebar / Analysis */}
+          <div className="lg:col-span-4 space-y-8">
+            {/* Health Analysis */}
+            <div className="bg-white rounded-[2.5rem] shadow-xl p-10 border border-white/20 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-10 opacity-[0.02] group-hover:scale-150 transition-transform duration-1000">
+                <Sparkles className="w-48 h-48 text-indigo-600" />
               </div>
-              <div className={`p-4 rounded-2xl flex items-center justify-between font-bold ${
-                Math.abs(totalNutrition.calories - profile.targetCalories) < 100 ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
-              }`}>
-                <span>Variance</span>
-                <span>{totalNutrition.calories > profile.targetCalories ? '+' : ''}{Math.round(totalNutrition.calories - profile.targetCalories)} kcal</span>
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-8 shadow-inner">
+                  <Sparkles className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h2 className="text-2xl font-black text-gray-800 tracking-tight mb-6">Plan Integrity</h2>
+                
+                <div className="space-y-6">
+                  <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                    <div className="flex items-center justify-between mb-2">
+                       <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Recommended Goal</span>
+                       <span className="text-sm font-black text-indigo-600">{profile.targetCalories} kcal</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-500 transition-all duration-1000" 
+                        style={{ width: `${Math.min(100, (totalNutrition.calories / profile.targetCalories) * 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div className={`p-6 rounded-3xl flex items-center justify-between font-black ${
+                    Math.abs(totalNutrition.calories - profile.targetCalories) < 100 
+                      ? 'bg-green-50 text-green-700' 
+                      : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="text-sm font-bold opacity-80 uppercase tracking-widest">Variance</span>
+                    </div>
+                    <span className="text-lg">{totalNutrition.calories > profile.targetCalories ? '+' : ''}{Math.round(totalNutrition.calories - profile.targetCalories)}</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Recommendations */}
+            {/* Smart Insights */}
             {recommendations.length > 0 && (
-              <div className="bg-amber-50 dark:bg-amber-900/10 border-2 border-amber-100 dark:border-amber-900/30 rounded-3xl p-8">
-                <div className="flex items-center space-x-3 mb-6 font-bold text-amber-900 dark:text-amber-400">
-                  <Info className="w-6 h-6" />
-                  <span>Health Insights</span>
+              <div className="bg-amber-50 rounded-[2.5rem] p-10 border-2 border-amber-100/50">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="w-12 h-12 bg-amber-200 rounded-2xl flex items-center justify-center shadow-sm">
+                    <Info className="w-6 h-6 text-amber-800" />
+                  </div>
+                  <h3 className="text-xl font-black text-amber-900 tracking-tight">Expert Analysis</h3>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {recommendations.map((rec, idx) => (
-                    <div key={idx} className="flex items-start space-x-3 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                      <div className="w-1.5 h-1.5 bg-amber-500 rounded-full mt-2 flex-shrink-0" />
-                      <p>{rec}</p>
+                    <div key={idx} className="flex items-start gap-4">
+                      <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <p className="text-sm font-bold text-amber-800 leading-relaxed opacity-80 pt-1">{rec}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Personalization Info */}
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden group">
-              <Sparkles className="w-12 h-12 mb-6 opacity-80 group-hover:scale-110 transition-transform" />
-              <h3 className="text-xl font-bold mb-4">Precision Plan</h3>
-              <p className="text-blue-100 text-sm leading-relaxed font-medium">
-                This plan is precision-tuned for <strong>{profile.goal.replace('-', ' ')}</strong>. We've optimized every macro to support your activity levels.
-              </p>
-              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+            {/* Precision Meta */}
+            <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
+               <div className="relative z-10">
+                  <h3 className="text-2xl font-black mb-4 tracking-tight">Adaptive Planning</h3>
+                  <p className="text-indigo-100 font-medium leading-relaxed opacity-90">
+                    This strategy is dynamically calculated for <strong>{profile.goal.replace('-', ' ')}</strong>. Every meal adjusts your metabolic throughput.
+                  </p>
+               </div>
+               <div className="absolute bottom-[-10%] right-[-10%] opacity-10">
+                  <RefreshCw className="w-40 h-40 animate-[spin_10s_linear_infinite]" />
+               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
   );
 }

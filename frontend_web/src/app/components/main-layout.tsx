@@ -70,7 +70,7 @@ export function MainLayout() {
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:pb-8 pb-24">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:pb-8 pb-24">
           <Outlet />
         </div>
       </main>

@@ -28,6 +28,7 @@ import { StepsTrackingScreen } from "@/app/components/steps-tracking-screen";
 import { SleepTrackingScreen } from "@/app/components/sleep-tracking-screen";
 import { AboutScreen } from "@/app/components/about-screen";
 import { RecipesScreen } from "@/app/components/recipes-screen";
+import { TimelineProgressScreen } from "@/app/components/timeline-progress-screen";
 import { MainLayout } from "@/app/components/main-layout";
 import { ErrorBoundary } from "@/app/components/error-boundary";
 
@@ -162,6 +163,10 @@ export const router = createBrowserRouter([
       {
         path: "sleep-tracking",
         Component: SleepTrackingScreen,
+      },
+      {
+        path: "timeline-progress",
+        Component: TimelineProgressScreen,
       },
       {
         path: "about",

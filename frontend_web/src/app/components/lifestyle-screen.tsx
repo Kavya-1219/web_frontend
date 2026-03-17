@@ -53,98 +53,106 @@ export function LifestyleScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-32">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 pt-12 pb-20 px-6 rounded-b-[2rem]">
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-4 p-2 hover:bg-white/10 rounded-lg transition"
-        >
-          <ArrowLeft className="w-6 h-6 text-white" />
-        </button>
-        <div className="flex items-center justify-center mb-3">
-          <Activity className="w-8 h-8 text-white" />
-        </div>
-        <h1 className="text-3xl text-white text-center mb-2">
-          Lifestyle & Activity
-        </h1>
-        <p className="text-green-50 text-center">
-          How active are you in daily life?
-        </p>
-        <div className="mt-4 flex items-center justify-center space-x-2">
-          <div className="w-8 h-1 bg-white rounded-full"></div>
-          <div className="w-8 h-1 bg-white rounded-full"></div>
-          <div className="w-8 h-1 bg-white rounded-full"></div>
-          <div className="w-8 h-1 bg-white rounded-full"></div>
-          <div className="w-8 h-1 bg-white/30 rounded-full"></div>
-        </div>
-      </div>
+      <div className="bg-gradient-to-r from-green-600 to-green-700 pt-12 pb-24 px-6 rounded-b-[3rem] shadow-xl">
+        <div className="max-w-4xl mx-auto w-full">
+          <button
+            onClick={() => navigate(-1)}
+            className="mb-6 p-3 hover:bg-white/10 rounded-2xl transition-all active:scale-95"
+          >
+            <ArrowLeft className="w-6 h-6 text-white" />
+          </button>
+          <div className="flex flex-col items-center">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+              <Activity className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-4xl text-white font-black text-center mb-2 tracking-tight">Lifestyle & Activity</h1>
+            <p className="text-green-50 text-center text-lg font-medium opacity-90">How active are you in daily life?</p>
+          </div>
 
-      {/* Activity Levels */}
-      <div className="flex-1 px-6 -mt-8 overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
-          <h2 className="text-base text-gray-700 mb-2 font-medium">
-            Select your typical activity level
-          </h2>
-          
-          {activityLevels.map((level) => {
-            const isSelected = activityLevel === level.id;
-            
-            return (
-              <button
-                key={level.id}
-                onClick={() => setActivityLevel(level.id)}
-                className={`w-full text-left p-5 rounded-2xl border-2 transition-all ${
-                  isSelected
-                    ? "border-green-500 bg-green-50 shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-3xl">{level.icon}</span>
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-800">{level.label}</h3>
-                      <p className="text-sm text-gray-600">{level.description}</p>
-                    </div>
-                  </div>
-                  {isSelected && (
-                    <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                </div>
-                <div className="ml-12 mt-2">
-                  <p className="text-xs text-gray-500 italic">
-                    Examples: {level.examples}
-                  </p>
-                </div>
-              </button>
-            );
-          })}
-
-          {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-6">
-            <p className="text-xs text-blue-800 leading-relaxed">
-              💡 Your activity level helps us calculate your daily calorie burn (TDEE) and adjust your nutrition plan accordingly.
-            </p>
+          {/* Progress Indicator - App Style */}
+          <div className="mt-10 flex items-center justify-center space-x-3 w-full px-4">
+            <div className="h-1.5 flex-1 bg-white rounded-full shadow-sm"></div>
+            <div className="h-1.5 flex-1 bg-white rounded-full shadow-sm"></div>
+            <div className="h-1.5 flex-1 bg-white rounded-full shadow-sm"></div>
+            <div className="h-1.5 flex-1 bg-white rounded-full shadow-sm"></div>
+            <div className="h-1.5 flex-1 bg-white/30 rounded-full"></div>
+            <div className="h-1.5 flex-1 bg-white/30 rounded-full"></div>
           </div>
         </div>
       </div>
 
-      {/* Continue Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-200">
-        <button
-          onClick={handleContinue}
-          disabled={!activityLevel}
-          className={`w-full py-4 rounded-xl shadow-lg transition ${
-            activityLevel
-              ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-          }`}
-        >
-          Continue to Goals
-        </button>
+      {/* Activity Levels */}
+      <div className="flex-1 px-6 -mt-10 pb-32">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl p-8 md:p-12 space-y-8 border border-white/20">
+            <h2 className="text-2xl text-gray-800 font-black tracking-tight text-center">
+              Select your typical activity level
+            </h2>
+            
+            <div className="grid grid-cols-1 gap-4">
+              {activityLevels.map((level) => {
+                const isSelected = activityLevel === level.id;
+                
+                return (
+                  <button
+                    key={level.id}
+                    onClick={() => setActivityLevel(level.id)}
+                    className={`w-full text-left p-6 rounded-3xl border-2 transition-all transform active:scale-[0.99] ${
+                      isSelected
+                        ? "border-green-500 bg-green-50/50 shadow-xl shadow-green-100"
+                        : "border-gray-100 bg-gray-50/30 hover:border-green-200"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-6">
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-4xl shadow-sm">
+                          {level.icon}
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-gray-800 tracking-tight mb-1">{level.label}</h3>
+                          <p className="text-gray-500 font-medium leading-relaxed">{level.description}</p>
+                          <div className="mt-3 inline-flex items-center px-4 py-1.5 bg-gray-100 rounded-full text-[10px] font-black uppercase tracking-widest text-gray-500">
+                            Examples: {level.examples}
+                          </div>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-200 shrink-0">
+                          <Check className="w-6 h-6 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 flex items-start space-x-4">
+              <span className="text-2xl">💡</span>
+              <p className="text-sm text-blue-800 font-medium leading-relaxed">
+                Your activity level helps us calculate your daily calorie burn (TDEE) and adjust your nutrition plan for optimal performance and health.
+              </p>
+            </div>
+
+            {/* Continue Button */}
+            <div className="pt-4">
+              <button
+                onClick={handleContinue}
+                disabled={!activityLevel}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
+                  activityLevel
+                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
+                    : "bg-gray-300 text-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Continue to Goals
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

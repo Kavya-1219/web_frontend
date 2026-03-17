@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Heart, Moon, Salad, Coffee, Wind, Clock, Bell, Sun, TrendingUp, Target } from "lucide-react";
+import { ArrowLeft, Heart, Moon, Salad, Coffee, Wind, Clock, Bell, Sun, TrendingUp, Target, Brain } from "lucide-react";
 import { useNavigate } from "react-router";
+import api, { endpoints } from "../helpers/api";
 
 interface SleepLog {
   bedtime: string;
@@ -27,6 +28,7 @@ export function StressMindCareScreen() {
   const [weeklyAverage, setWeeklyAverage] = useState(0);
   const [lastNotificationTime, setLastNotificationTime] = useState<string>("");
   const [snoozeUntil, setSnoozeUntil] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(false);
   
   // State for 12-hour format picker
   const [bedtimeUI, setBedtimeUI] = useState({ hour: "10", minute: "00", period: "PM" });
@@ -51,7 +53,6 @@ export function StressMindCareScreen() {
   
   // Update UI state when modal opens
   const openSleepScheduleModal = () => {
-    // Convert bedtime to 12-hour
     const [bedHours, bedMinutes] = sleepSchedule.bedtime.split(':');
     const bedHour = parseInt(bedHours);
     setBedtimeUI({
@@ -60,7 +61,6 @@ export function StressMindCareScreen() {
       period: bedHour >= 12 ? 'PM' : 'AM'
     });
     
-    // Convert wake time to 12-hour
     const [wakeHours, wakeMinutes] = sleepSchedule.wakeTime.split(':');
     const wakeHour = parseInt(wakeHours);
     setWakeTimeUI({
@@ -76,7 +76,6 @@ export function StressMindCareScreen() {
     loadSleepData();
     loadUserAge();
     
-    // Set up bedtime reminder check
     const reminderInterval = setInterval(() => {
       const email = localStorage.getItem('currentUserEmail');
       const savedReminder = localStorage.getItem(`sleepReminder_${email}`);
@@ -88,24 +87,17 @@ export function StressMindCareScreen() {
         const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         const currentTimeKey = `${currentTime}_${now.toDateString()}`;
         
-        // Check if it's bedtime and we haven't notified today
         if (currentTime === schedule.bedtime && lastNotificationTime !== currentTimeKey) {
-          // Check if user snoozed and snooze hasn't expired
           const snoozeData = localStorage.getItem(`sleepSnooze_${email}`);
           if (snoozeData) {
             const snoozeTime = parseInt(snoozeData);
-            if (Date.now() < snoozeTime) {
-              return; // Still in snooze period, don't show notification
-            } else {
-              // Snooze expired, remove it
-              localStorage.removeItem(`sleepSnooze_${email}`);
-            }
+            if (Date.now() < snoozeTime) return;
+            localStorage.removeItem(`sleepSnooze_${email}`);
           }
           
           setLastNotificationTime(currentTimeKey);
           setShowWindDown(true);
           
-          // Send browser notification
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('Time for Bed 🌙', {
               body: 'Sleeping on time helps digestion and reduces cravings.',
@@ -114,33 +106,55 @@ export function StressMindCareScreen() {
           }
         }
       }
-    }, 10000); // Check every 10 seconds for more accurate timing
-    
+    }, 10000);
+
     return () => clearInterval(reminderInterval);
   }, [lastNotificationTime]);
 
-  const loadUserAge = () => {
-    const personalDetails = JSON.parse(localStorage.getItem('personalDetails') || '{}');
-    const age = parseInt(personalDetails.age) || 25;
-    setUserAge(age);
+  const loadUserAge = async () => {
+    try {
+      const response = await api.get(endpoints.home);
+      if (response.data) {
+        setUserAge(response.data.age || 25);
+      }
+    } catch (error) {
+       console.error("Age fetch failed:", error);
+       const email = localStorage.getItem('currentUserEmail');
+       const personalDetails = JSON.parse(localStorage.getItem(`personalDetails_${email}`) || '{}');
+       setUserAge(personalDetails.age || 25);
+    }
   };
 
-  const loadSleepData = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const savedSchedule = localStorage.getItem(`sleepSchedule_${email}`);
-    const savedLogs = localStorage.getItem(`sleepLogs_${email}`);
-    const savedReminder = localStorage.getItem(`sleepReminder_${email}`);
-    
-    if (savedSchedule) {
-      setSleepSchedule(JSON.parse(savedSchedule));
-    }
-    if (savedLogs) {
-      const logs = JSON.parse(savedLogs);
-      setSleepLogs(logs);
-      calculateWeeklyAverage(logs);
-    }
-    if (savedReminder) {
-      setReminderEnabled(savedReminder === 'true');
+  const loadSleepData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get("/sleep/");
+      if (response.data && response.data.results) {
+        setSleepLogs(response.data.results.map((log: any) => ({
+          bedtime: log.bedtime,
+          wakeTime: log.wake_time,
+          duration: log.duration_display || "0h 0m",
+          durationMinutes: log.duration_minutes || 0,
+          quality: log.quality,
+          date: log.date,
+          motivationMessage: log.motivation_message || ""
+        })));
+        
+        const totalMinutes = response.data.results.reduce((acc: number, log: any) => acc + (log.duration_minutes || 0), 0);
+        setWeeklyAverage(response.data.results.length > 0 ? totalMinutes / 60 / response.data.results.length : 0);
+      }
+    } catch (error) {
+      console.error("Sleep data fetch failed:", error);
+      const email = localStorage.getItem('currentUserEmail');
+      const savedLogs = localStorage.getItem(`sleepLogs_${email}`);
+      if (savedLogs) {
+        const logs = JSON.parse(savedLogs);
+        setSleepLogs(logs);
+        const totalMinutes = logs.reduce((acc: number, log: SleepLog) => acc + log.durationMinutes, 0);
+        setWeeklyAverage(logs.length > 0 ? totalMinutes / 60 / logs.length : 0);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -454,23 +468,39 @@ export function StressMindCareScreen() {
   const todayQuality = todaySleep ? getSleepQualityByAge(todaySleep.durationMinutes, userAge) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20">
+    <div className="min-h-screen bg-gray-50/50 dark:bg-gray-950 pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-br from-green-500 to-teal-600 dark:from-green-700 dark:to-teal-800 text-white px-6 pt-12 pb-8">
+      <div className="bg-gradient-to-br from-green-600 to-teal-700 dark:from-green-800 dark:to-teal-900 pt-8 pb-6 px-6 rounded-b-[2rem] relative overflow-hidden">
         <button
           onClick={() => navigate(-1)}
-          className="mb-4 p-2 hover:bg-white/10 rounded-full transition"
+          className="mb-4 p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all active:scale-95 text-white flex items-center space-x-2 group"
         >
-          <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-bold text-xs uppercase tracking-widest">Back</span>
         </button>
-        
-        <h1 className="text-3xl font-bold mb-2">Mind Care Support</h1>
-        <p className="text-green-100 dark:text-green-200 text-base">
-          Nutrition-focused guidance for calm mind, better sleep, and healthy eating
-        </p>
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="max-w-xl">
+            <h1 className="text-3xl text-white font-bold tracking-tight mb-1">Mind Care Support</h1>
+            <p className="text-green-50 text-base font-medium opacity-90 leading-relaxed">
+              Nutrition-focused guidance for a calm mind, better sleep, and metabolic harmony.
+            </p>
+          </div>
+
+          <div className="hidden md:flex flex-col items-end">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner mb-2">
+              <Brain className="w-8 h-8 text-white" />
+            </div>
+            <span className="text-white/60 text-[10px] font-black uppercase tracking-[0.2em]">Health Intelligence</span>
+          </div>
+        </div>
+
+        {/* Decorative elements */}
+        <div className="absolute top-[-20%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-[-10%] left-[-5%] w-48 h-48 bg-black/5 rounded-full blur-2xl"></div>
       </div>
 
-      <div className="px-6 pb-6 space-y-6 -mt-4">
+      <div className="px-6 mt-4 space-y-8">
         {/* Why Stress & Sleep Matter Section */}
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div className="flex items-start gap-3 mb-4">

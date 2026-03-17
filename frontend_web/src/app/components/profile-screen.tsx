@@ -186,18 +186,21 @@ export function ProfileScreen() {
           )}
         </div>
         <div className="flex items-center justify-center">
-          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg">
+          <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg relative cursor-pointer">
             {profilePicture ? (
-              <img src={profilePicture} alt="Profile" className="w-12 h-12 rounded-full" />
+              <img src={profilePicture} alt="Profile" className="w-24 h-24 rounded-full object-cover" />
             ) : (
               <User className="w-12 h-12 text-green-600" />
             )}
+            <div className="absolute bottom-0 right-0 p-1.5 bg-green-500 rounded-full border-2 border-white">
+                <Edit2 className="w-3 h-3 text-white" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Profile Content */}
-      <div className="px-6 -mt-16 space-y-4 overflow-y-auto">
+      <div className="px-6 -mt-16 space-y-4">
         {/* Email (Non-editable) */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
           <h3 className="text-sm text-gray-500 dark:text-gray-400 mb-2">Email</h3>
@@ -215,7 +218,7 @@ export function ProfileScreen() {
                 type="text"
                 value={profileData.name}
                 onChange={(e) => setProfileData({...profileData, name: e.target.value})}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
               />
             ) : (
               <p className="text-base text-gray-800 dark:text-white">{profileData.name}</p>
@@ -230,7 +233,7 @@ export function ProfileScreen() {
                   type="number"
                   value={profileData.age}
                   onChange={(e) => setProfileData({...profileData, age: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
               ) : (
                 <p className="text-base text-gray-800 dark:text-white">{profileData.age} years</p>
@@ -242,7 +245,7 @@ export function ProfileScreen() {
                 <select
                   value={profileData.gender}
                   onChange={(e) => setProfileData({...profileData, gender: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -267,7 +270,7 @@ export function ProfileScreen() {
                   type="number"
                   value={profileData.height}
                   onChange={(e) => setProfileData({...profileData, height: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
               ) : (
                 <p className="text-base text-gray-800 dark:text-white">{profileData.height} {profileData.heightUnit}</p>
@@ -280,7 +283,7 @@ export function ProfileScreen() {
                   type="number"
                   value={profileData.weight}
                   onChange={(e) => setProfileData({...profileData, weight: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
               ) : (
                 <p className="text-base text-gray-800 dark:text-white">{profileData.weight} {profileData.weightUnit}</p>
@@ -296,7 +299,7 @@ export function ProfileScreen() {
                   type="number"
                   value={profileData.targetWeight}
                   onChange={(e) => setProfileData({...profileData, targetWeight: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
               ) : (
                 <p className="text-base text-gray-800 dark:text-white">{profileData.targetWeight} {profileData.weightUnit}</p>
@@ -315,7 +318,7 @@ export function ProfileScreen() {
               <select
                 value={profileData.dietType}
                 onChange={(e) => setProfileData({...profileData, dietType: e.target.value})}
-                className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
               >
                 <option value="Vegetarian">Vegetarian</option>
                 <option value="Non-Vegetarian">Non-Vegetarian</option>
@@ -340,7 +343,7 @@ export function ProfileScreen() {
             
             <div className="flex flex-wrap gap-2">
               {profileData.healthConditions.map(condition => (
-                <span key={condition} className="px-3 py-1 bg-red-50 text-red-700 rounded-full text-sm capitalize">
+                <span key={condition} className="px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full text-sm capitalize border border-red-100 dark:border-red-800">
                   {condition.replace('-', ' ')}
                 </span>
               ))}
@@ -379,7 +382,7 @@ export function ProfileScreen() {
                 <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Food Allergies</label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {profileData.allergicFoods.map(food => (
-                    <span key={food} className="px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-sm">
+                    <span key={food} className="px-3 py-1 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-sm border border-amber-100 dark:border-amber-800">
                       {food}
                     </span>
                   ))}
@@ -416,9 +419,9 @@ export function ProfileScreen() {
               </div>
 
               {passwordError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-2">
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start space-x-2">
                   <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-800">{passwordError}</p>
+                  <p className="text-sm text-red-800 dark:text-red-200">{passwordError}</p>
                 </div>
               )}
 
@@ -429,7 +432,7 @@ export function ProfileScreen() {
                     type={showPassword ? "text" : "password"}
                     value={passwordData.currentPassword}
                     onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
-                    className="w-full px-3 py-2 pr-10 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                    className="w-full px-3 py-2 pr-10 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                   />
                   <button
                     type="button"
@@ -447,7 +450,7 @@ export function ProfileScreen() {
                   type={showPassword ? "text" : "password"}
                   value={passwordData.newPassword}
                   onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">At least 8 characters with 1 special character</p>
               </div>
@@ -458,7 +461,7 @@ export function ProfileScreen() {
                   type={showPassword ? "text" : "password"}
                   value={passwordData.confirmPassword}
                   onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-lg focus:border-green-500 focus:outline-none"
                 />
               </div>
 
@@ -480,7 +483,7 @@ export function ProfileScreen() {
                 loadProfileData();
                 setIsEditing(false);
               }}
-              className="flex-1 py-4 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition flex items-center justify-center space-x-2"
+              className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition flex items-center justify-center space-x-2"
             >
               <X className="w-5 h-5" />
               <span>Cancel</span>

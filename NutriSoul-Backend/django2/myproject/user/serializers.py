@@ -16,9 +16,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         }
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        normalized_email = value.lower().strip()
+        if User.objects.filter(email__iexact=normalized_email).exists():
             raise serializers.ValidationError("A user with this email already exists.")
-        return value
+        return normalized_email
 
     def validate_password(self, value):
         # Special character validation as requested in UI: (!@#$%^&*)
@@ -51,13 +52,18 @@ class LoginSerializer(serializers.Serializer):
     def validate(self, data):
         email = data.get('email')
         password = data.get('password')
+        print(f"DEBUG LOGIN: Email={email}, PwdLen={len(password) if password else 0}")
 
         if email and password:
-            user = User.objects.filter(email=email).first()
+            email = email.lower().strip()
+            user = User.objects.filter(email__iexact=email).first()
             if user:
-                if not user.check_password(password):
+                is_correct = user.check_password(password)
+                print(f"DEBUG LOGIN: User found ID={user.id}, Correct={is_correct}")
+                if not is_correct:
                     raise serializers.ValidationError("Incorrect password.")
             else:
+                print(f"DEBUG LOGIN: No user found for {email}")
                 raise serializers.ValidationError("No user found with this email.")
         else:
             raise serializers.ValidationError("Must include both email and password.")
@@ -69,19 +75,26 @@ class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
     def validate_email(self, value):
-        if not User.objects.filter(email=value).exists():
+        normalized_email = value.lower().strip()
+        if not User.objects.filter(email__iexact=normalized_email).exists():
             raise serializers.ValidationError("No user found with this email.")
-        return value
+        return normalized_email
 
 class VerifyOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6)
+
+    def validate_email(self, value):
+        return value.lower().strip()
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6)
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True)
+
+    def validate_email(self, value):
+        return value.lower().strip()
 
     def validate_password(self, value):
         if not re.search(r"[!@#$%^&*]", value):

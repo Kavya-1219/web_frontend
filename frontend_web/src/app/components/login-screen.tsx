@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 import logo from "figma:asset/92b2cb3a86bea6d7f9af7d0e725e0f2b7664fe56.png";
 
 export function LoginScreen() {
@@ -9,29 +10,55 @@ export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
     
-    // Get registered users
-    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
-    
-    // Find matching user (case-insensitive email)
-    const user = users.find((u: any) => 
-      u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    
-    if (!user) {
-      setError("Sorry, we didn't find your details. Please register again.");
-      return;
+    try {
+      const response = await api.post(endpoints.login, {
+        email: email, 
+        password: password
+      });
+
+      if (response.data && response.data.token) {
+        // Store user info and token
+        localStorage.setItem('user', JSON.stringify({
+          email: response.data.email,
+          username: response.data.username,
+          token: response.data.token,
+          user_id: response.data.user_id
+        }));
+        
+        localStorage.setItem('currentUserEmail', response.data.email);
+        navigate("/app");
+      }
+    } catch (err: any) {
+      console.error("Login failed:", err);
+      if (err.response?.data) {
+        if (err.response.data.non_field_errors) {
+          setError(err.response.data.non_field_errors[0]);
+        } else if (err.response.data.error) {
+          setError(err.response.data.error);
+        } else {
+          // Flatten any field-level errors to show them
+          const firstErrorValue = Object.values(err.response.data)[0];
+          if (Array.isArray(firstErrorValue)) {
+            setError(firstErrorValue[0]);
+          } else if (typeof firstErrorValue === "string") {
+            setError(firstErrorValue);
+          } else {
+            setError(JSON.stringify(err.response.data));
+          }
+        }
+      } else {
+        setError("Network error or server unreachable. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Set current user
-    localStorage.setItem('currentUserEmail', email);
-    
-    // Always go to app if user exists
-    navigate("/app");
   };
 
   return (
@@ -142,9 +169,17 @@ export function LoginScreen() {
             {/* Login Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-[1.02] active:scale-[0.98]"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl shadow-lg hover:shadow-xl transition transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center disabled:opacity-70 disabled:scale-100"
             >
-              Login
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                "Login"
+              )}
             </button>
 
             {/* Sign Up Link */}

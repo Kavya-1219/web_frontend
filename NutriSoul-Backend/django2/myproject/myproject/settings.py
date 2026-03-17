@@ -39,10 +39,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'corsheaders',
     'user',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -152,3 +154,5 @@ GEMINI_MOCK_MODE = False  # Set to True to test without hitting API quotas
 # Edamam API Settings (Nutrition Fallback)
 EDAMAM_APP_ID = 'your_edamam_app_id'
 EDAMAM_API_KEY = 'your_edamam_api_key'
+
+CORS_ALLOW_ALL_ORIGINS = True
