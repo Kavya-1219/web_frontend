@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Brain, Leaf, Moon, Heart, ArrowLeft, Check } from "lucide-react";
+import { Brain, Leaf, Moon, Heart, ArrowLeft, Check, Loader2 } from "lucide-react";
 
 const stressReliefFoods = [
   {
@@ -56,6 +56,7 @@ export function StressManagementScreen() {
   const navigate = useNavigate();
   const [selectedFoods, setSelectedFoods] = useState<string[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleFood = (category: string) => {
     setSelectedFoods(prev =>
@@ -65,13 +66,22 @@ export function StressManagementScreen() {
     );
   };
 
-  const handleContinue = () => {
-    // Save stress management preferences
-    localStorage.setItem('stressManagement', JSON.stringify({
-      selectedFoods,
-      selectedExercise
-    }));
-    navigate("/final-preferences");
+  const handleContinue = async () => {
+    setIsLoading(true);
+    try {
+      // Save stress management preferences
+      localStorage.setItem('stressManagement', JSON.stringify({
+        selectedFoods,
+        selectedExercise
+      }));
+      
+      // Simulate/future-proof sync
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      navigate("/final-preferences");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -241,9 +251,21 @@ export function StressManagementScreen() {
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-200">
         <button
           onClick={handleContinue}
-          className="w-full py-4 rounded-xl shadow-lg transition bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl"
+          disabled={isLoading}
+          className={`w-full py-4 rounded-xl shadow-lg transition flex items-center justify-center ${
+            isLoading 
+              ? "bg-gray-400 cursor-not-allowed" 
+              : "bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-xl"
+          }`}
         >
-          Continue to Dietary Preferences
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Saving Preferences...
+            </>
+          ) : (
+            "Continue to Dietary Preferences"
+          )}
         </button>
       </div>
     </div>

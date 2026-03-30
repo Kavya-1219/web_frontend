@@ -242,13 +242,16 @@ const mealDatabase = {
 
 // Get user profile from localStorage
 export function getUserProfile(): UserProfile {
-  const personalDetails = JSON.parse(localStorage.getItem('personalDetails') || '{}');
-  const bodyDetails = JSON.parse(localStorage.getItem('bodyDetails') || '{}');
-  const lifestyle = JSON.parse(localStorage.getItem('lifestyle') || '{}');
-  const foodPreferences = JSON.parse(localStorage.getItem('foodPreferences') || '{}');
-  const goals = JSON.parse(localStorage.getItem('userGoals') || '["maintain-weight"]');
-  const healthConditions = JSON.parse(localStorage.getItem('healthConditions') || '[]');
-  const healthConditionDetails = JSON.parse(localStorage.getItem('healthConditionDetails') || '{}');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userEmail = user.email || user.username || localStorage.getItem('currentUserEmail') || 'default';
+  
+  const personalDetails = JSON.parse(localStorage.getItem(`personalDetails_${userEmail}`) || localStorage.getItem('personalDetails') || '{}');
+  const bodyDetails = JSON.parse(localStorage.getItem(`bodyDetails_${userEmail}`) || localStorage.getItem('bodyDetails') || '{}');
+  const lifestyle = JSON.parse(localStorage.getItem(`lifestyle_${userEmail}`) || localStorage.getItem('lifestyle') || '{}');
+  const foodPreferences = JSON.parse(localStorage.getItem(`foodPreferences_${userEmail}`) || localStorage.getItem('foodPreferences') || '{}');
+  const goals = JSON.parse(localStorage.getItem(`userGoals_${userEmail}`) || localStorage.getItem('userGoals') || '["maintain-weight"]');
+  const healthConditions = JSON.parse(localStorage.getItem(`healthConditions_${userEmail}`) || localStorage.getItem('healthConditions') || '[]');
+  const healthConditionDetails = JSON.parse(localStorage.getItem(`healthConditionDetails_${userEmail}`) || localStorage.getItem('healthConditionDetails') || '{}');
 
   // Calculate target calories
   const weight = parseFloat(bodyDetails.weight) || 70;

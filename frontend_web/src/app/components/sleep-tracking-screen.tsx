@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
 import { Moon, Sun, Plus, TrendingUp, Target, Clock, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router";
+import api, { endpoints } from "../helpers/api";
 
 interface SleepLog {
-  hours: number;
-  quality: 'poor' | 'fair' | 'good' | 'excellent';
+  date: string;
   bedtime: string;
-  wakeTime: string;
-  timestamp: string;
+  wake_time: string;
+  duration: string;
+  duration_minutes: number;
+  quality: 'Poor' | 'Fair' | 'Good' | 'Excellent';
 }
 
 export function SleepTrackingScreen() {
+  const navigate = useNavigate();
   const [todaySleep, setTodaySleep] = useState<number | null>(null);
   const [weeklyAverage, setWeeklyAverage] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sleepData, setSleepData] = useState({
     hours: "8",
-    quality: "good" as 'poor' | 'fair' | 'good' | 'excellent',
+    quality: "Good" as 'Poor' | 'Fair' | 'Good' | 'Excellent',
     bedtime: "22:00",
     wakeTime: "06:00"
   });
@@ -24,73 +28,68 @@ export function SleepTrackingScreen() {
   const targetSleep = 8; // hours
 
   useEffect(() => {
-    loadTodaySleep();
-    calculateWeeklyAverage();
+    fetchSleepData();
+
+    const handleRefresh = () => fetchSleepData();
+    window.addEventListener('refreshDashboard', handleRefresh);
+    return () => window.removeEventListener('refreshDashboard', handleRefresh);
   }, []);
 
-  const loadTodaySleep = () => {
-    const today = new Date().toDateString();
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    
-    const todayLog = logs.find((log: SleepLog) => 
-      new Date(log.timestamp).toDateString() === today
-    );
-    
-    setTodaySleep(todayLog ? todayLog.hours : null);
-  };
-
-  const calculateWeeklyAverage = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const weekLogs = logs.filter((log: SleepLog) => 
-      new Date(log.timestamp) >= sevenDaysAgo
-    );
-    
-    if (weekLogs.length > 0) {
-      const total = weekLogs.reduce((sum: number, log: SleepLog) => sum + log.hours, 0);
-      setWeeklyAverage(Math.round((total / weekLogs.length) * 10) / 10);
+  const fetchSleepData = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(endpoints.sleepLogs);
+      const { weekly_average_hours, logs } = response.data;
+      
+      setWeeklyAverage(weekly_average_hours);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const todayLog = logs.find((log: any) => log.date === today);
+      if (todayLog) {
+        setTodaySleep(Math.round(todayLog.duration_minutes / 60 * 10) / 10);
+      } else {
+        setTodaySleep(null);
+      }
+    } catch (error) {
+      console.error("Error fetching sleep data:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addSleepLog = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    
-    const newLog: SleepLog = {
-      hours: parseFloat(sleepData.hours),
-      quality: sleepData.quality,
-      bedtime: sleepData.bedtime,
-      wakeTime: sleepData.wakeTime,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Remove today's log if exists and add new one
-    const today = new Date().toDateString();
-    const filteredLogs = logs.filter((log: SleepLog) => 
-      new Date(log.timestamp).toDateString() !== today
-    );
-    
-    filteredLogs.push(newLog);
-    localStorage.setItem(`sleepLogs_${email}`, JSON.stringify(filteredLogs));
-    
-    setTodaySleep(newLog.hours);
-    calculateWeeklyAverage();
-    setShowAddModal(false);
+  const addSleepLog = async () => {
+    try {
+      const hoursNum = parseFloat(sleepData.hours);
+      const mins = Math.round(hoursNum * 60);
+      const durationStr = `${Math.floor(hoursNum)}h ${Math.round((hoursNum % 1) * 60)}m`;
+      
+      const payload = {
+        date: new Date().toISOString().split('T')[0],
+        bedtime: sleepData.bedtime,
+        wake_time: sleepData.wakeTime,
+        duration: durationStr,
+        duration_minutes: mins,
+        quality: sleepData.quality
+      };
+
+      await api.post(endpoints.sleepLogs, payload);
+      await fetchSleepData();
+      setShowAddModal(false);
+    } catch (error) {
+      console.error("Error saving sleep log:", error);
+      alert("Failed to save sleep log. Please try again.");
+    }
   };
 
   const getSleepQualityColor = (quality: string) => {
+    const q = quality.toLowerCase();
     const colors = {
       poor: 'text-red-600 bg-red-50',
       fair: 'text-yellow-600 bg-yellow-50',
       good: 'text-green-600 bg-green-50',
       excellent: 'text-purple-600 bg-purple-50'
     };
-    return colors[quality as keyof typeof colors] || colors.good;
+    return colors[q as keyof typeof colors] || colors.good;
   };
 
   const getMotivationMessage = () => {
@@ -103,7 +102,13 @@ export function SleepTrackingScreen() {
 
   const progress = todaySleep ? Math.min((todaySleep / targetSleep) * 100, 100) : 0;
 
-  const navigate = useNavigate();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-purple-50 dark:from-gray-900 dark:to-indigo-900/20 pb-24">
@@ -286,7 +291,7 @@ export function SleepTrackingScreen() {
               <div>
                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-3">Sleep Quality</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {(['poor', 'fair', 'good', 'excellent'] as const).map((quality) => (
+                  {(['Poor', 'Fair', 'Good', 'Excellent'] as const).map((quality) => (
                     <button
                       key={quality}
                       onClick={() => setSleepData({...sleepData, quality})}

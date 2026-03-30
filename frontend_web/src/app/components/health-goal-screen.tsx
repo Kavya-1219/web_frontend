@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { TrendingDown, TrendingUp, Dumbbell, Heart, Check, ArrowLeft } from "lucide-react";
+import { TrendingDown, TrendingUp, Dumbbell, Heart, Check, ArrowLeft, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 const goals = [
   { id: "lose-weight", label: "Lose weight", icon: TrendingDown, color: "bg-blue-50 border-blue-200 text-blue-600", isWeight: true },
@@ -12,6 +13,7 @@ const goals = [
 export function HealthGoalScreen() {
   const navigate = useNavigate();
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleGoal = (goalId: string) => {
     setSelectedGoals(prev => 
@@ -21,21 +23,33 @@ export function HealthGoalScreen() {
     );
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedGoals.length > 0) {
-      // Store selected goals in localStorage
-      localStorage.setItem('userGoals', JSON.stringify(selectedGoals));
-      
-      // Check if any goal is weight-based
-      const hasWeightGoal = selectedGoals.some(goalId => 
-        goals.find(g => g.id === goalId)?.isWeight
-      );
-      
-      // Dynamic navigation based on goal type
-      if (hasWeightGoal) {
-        navigate("/goal-weight");
-      } else {
+      setIsLoading(true);
+      try {
+        // Store selected goals in localStorage
+        localStorage.setItem('userGoals', JSON.stringify(selectedGoals));
+        
+        await api.post(endpoints.goals, {
+          goals: selectedGoals,
+        });
+
+        // Check if any goal is weight-based
+        const hasWeightGoal = selectedGoals.some(goalId => 
+            goals.find(g => g.id === goalId)?.isWeight
+        );
+        
+        // Dynamic navigation based on goal type
+        if (hasWeightGoal) {
+            navigate("/goal-weight");
+        } else {
+            navigate("/health-conditions");
+        }
+      } catch (error) {
+        console.error("Failed to save goals:", error);
         navigate("/health-conditions");
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -111,14 +125,21 @@ export function HealthGoalScreen() {
             <div className="pt-6">
               <button
                 onClick={handleContinue}
-                disabled={selectedGoals.length === 0}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  selectedGoals.length > 0
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || selectedGoals.length === 0}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform flex items-center justify-center ${
+                  isLoading || selectedGoals.length === 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                    Saving Goals...
+                  </>
+                ) : (
+                  "Continue"
+                )}
               </button>
             </div>
           </div>

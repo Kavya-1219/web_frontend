@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Heart, ArrowLeft, Check, ChevronRight } from "lucide-react";
+import { Heart, ArrowLeft, Check, ChevronRight, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 interface ConditionDetail {
   diabetesType?: string;
@@ -29,6 +30,7 @@ export function HealthConditionsDetailedScreen() {
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [conditionDetails, setConditionDetails] = useState<ConditionDetail>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleCondition = (conditionId: string) => {
     if (conditionId === "none") {
@@ -49,23 +51,52 @@ export function HealthConditionsDetailedScreen() {
     healthConditions.find(c => c.id === id)?.needsDetail
   );
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedConditions.length > 0) {
       if (needsDetailScreen && !showDetails) {
         setShowDetails(true);
       } else {
-        // Save all data
-        localStorage.setItem('healthConditions', JSON.stringify(selectedConditions));
-        localStorage.setItem('healthConditionDetails', JSON.stringify(conditionDetails));
-        
-        // Check if user selected "Manage stress" goal
-        const userGoals = JSON.parse(localStorage.getItem('userGoals') || '[]');
-        const hasStressGoal = userGoals.includes('manage-stress');
-        
-        if (hasStressGoal) {
-          navigate("/stress-management");
-        } else {
+        setIsLoading(true);
+        try {
+          // Save all data
+          localStorage.setItem('healthConditions', JSON.stringify(selectedConditions));
+          localStorage.setItem('healthConditionDetails', JSON.stringify(conditionDetails));
+          
+          // First sync basic conditions
+          await api.post(endpoints.healthConditions, {
+            healthConditions: selectedConditions,
+          });
+
+          // Then sync specific details if they exist
+          if (needsDetailScreen) {
+            const payload: any = {};
+            if (conditionDetails.diabetesType) payload.diabetesType = conditionDetails.diabetesType;
+            if (conditionDetails.bpReading) {
+              payload.systolic = parseInt(conditionDetails.bpReading.systolic);
+              payload.diastolic = parseInt(conditionDetails.bpReading.diastolic);
+            }
+            if (conditionDetails.thyroidType) payload.thyroidCondition = conditionDetails.thyroidType;
+            if (conditionDetails.cholesterolLevel) payload.cholesterolLevel = conditionDetails.cholesterolLevel;
+            if (conditionDetails.allergicFoods) payload.foodAllergies = conditionDetails.allergicFoods;
+            if (conditionDetails.customAllergy) payload.otherAllergies = conditionDetails.customAllergy;
+
+            await api.post(endpoints.healthDetails, payload);
+          }
+
+          // Check if user selected "Manage stress" goal
+          const userGoals = JSON.parse(localStorage.getItem('userGoals') || '[]');
+          const hasStressGoal = userGoals.includes('manage-stress');
+          
+          if (hasStressGoal) {
+            navigate("/stress-management");
+          } else {
+            navigate("/final-preferences");
+          }
+        } catch (error) {
+          console.error("Failed to save health conditions:", error);
           navigate("/final-preferences");
+        } finally {
+          setIsLoading(false);
         }
       }
     }
@@ -141,7 +172,7 @@ export function HealthConditionsDetailedScreen() {
                         ...conditionDetails,
                         bpReading: { ...conditionDetails.bpReading!, systolic: e.target.value, diastolic: conditionDetails.bpReading?.diastolic || "" }
                       })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                     />
                   </div>
                   <div>
@@ -154,7 +185,7 @@ export function HealthConditionsDetailedScreen() {
                         ...conditionDetails,
                         bpReading: { systolic: conditionDetails.bpReading?.systolic || "", diastolic: e.target.value }
                       })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                     />
                   </div>
                 </div>
@@ -180,7 +211,7 @@ export function HealthConditionsDetailedScreen() {
                         ...conditionDetails,
                         bpReading: { ...conditionDetails.bpReading!, systolic: e.target.value, diastolic: conditionDetails.bpReading?.diastolic || "" }
                       })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                     />
                   </div>
                   <div>
@@ -193,7 +224,7 @@ export function HealthConditionsDetailedScreen() {
                         ...conditionDetails,
                         bpReading: { systolic: conditionDetails.bpReading?.systolic || "", diastolic: e.target.value }
                       })}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                      className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                     />
                   </div>
                 </div>
@@ -238,7 +269,7 @@ export function HealthConditionsDetailedScreen() {
                   placeholder="e.g., 220"
                   value={conditionDetails.cholesterolLevel || ""}
                   onChange={(e) => setConditionDetails({...conditionDetails, cholesterolLevel: e.target.value})}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                 />
                 <p className="text-xs text-gray-500 mt-2">Normal: &lt;200 | High: ≥240 mg/dL</p>
               </div>
@@ -284,7 +315,7 @@ export function HealthConditionsDetailedScreen() {
                     placeholder="e.g., Strawberries, Mustard"
                     value={conditionDetails.customAllergy || ""}
                     onChange={(e) => setConditionDetails({...conditionDetails, customAllergy: e.target.value})}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                    className="w-full px-4 py-3 border-2 border-gray-100 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
                   />
                 </div>
               </div>
@@ -296,9 +327,21 @@ export function HealthConditionsDetailedScreen() {
         <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-200">
           <button
             onClick={handleContinue}
-            className="w-full py-4 rounded-xl shadow-lg transition bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl"
+            disabled={isLoading}
+            className={`w-full py-4 rounded-xl shadow-lg transition flex items-center justify-center ${
+              isLoading 
+                ? "bg-gray-400 cursor-not-allowed" 
+                : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl"
+            }`}
           >
-            Save & Continue
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Saving Details...
+              </>
+            ) : (
+              "Save & Continue"
+            )}
           </button>
         </div>
       </div>
@@ -376,14 +419,21 @@ export function HealthConditionsDetailedScreen() {
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-gray-200">
         <button
           onClick={handleContinue}
-          disabled={selectedConditions.length === 0}
-          className={`w-full py-4 rounded-xl shadow-lg transition ${
-            selectedConditions.length > 0
-              ? "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          disabled={isLoading || selectedConditions.length === 0}
+          className={`w-full py-4 rounded-xl shadow-lg transition flex items-center justify-center ${
+            isLoading || selectedConditions.length === 0
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl"
           }`}
         >
-          Continue
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            selectedConditions.length > 0 && needsDetailScreen ? "Add Details" : "Continue"
+          )}
         </button>
       </div>
     </div>

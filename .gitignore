@@ -1,0 +1,41 @@
+# Web Frontend Project .gitignore
+
+# Node modules
+node_modules/
+frontend_web/node_modules/
+
+# Python / Django
+__pycache__/
+*.pyc
+NutriSoul-Backend/django2/venv/
+NutriSoul-Backend/django2/env/
+NutriSoul-Backend/django2/__pycache__/
+NutriSoul-Backend/django2/myproject/__pycache__/
+NutriSoul-Backend/django2/myproject/user/__pycache__/
+NutriSoul-Backend/django2/myproject/myproject/__pycache__/
+
+# Database
+db.sqlite3
+*.sqlite3
+NutriSoul-Backend/django2/myproject/db.sqlite3
+
+# Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+NutriSoul-Backend/django2/myproject/.env
+
+# Build / Production
+dist/
+build/
+frontend_web/dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -37,20 +37,27 @@ export function LoginScreen() {
       }
     } catch (err: any) {
       console.error("Login failed:", err);
-      if (err.response?.data) {
-        if (err.response.data.non_field_errors) {
-          setError(err.response.data.non_field_errors[0]);
-        } else if (err.response.data.error) {
-          setError(err.response.data.error);
+      if (err.response?.data && typeof err.response.data === 'object') {
+        const serverErrors = err.response.data;
+        if (serverErrors.non_field_errors) {
+          setError(serverErrors.non_field_errors[0]);
+        } else if (serverErrors.error) {
+          setError(serverErrors.error);
+        } else if (serverErrors.email) {
+          setError(serverErrors.email[0]);
+        } else if (serverErrors.password) {
+          setError(serverErrors.password[0]);
+        } else if (serverErrors.detail) {
+          setError(serverErrors.detail);
         } else {
           // Flatten any field-level errors to show them
-          const firstErrorValue = Object.values(err.response.data)[0];
+          const firstErrorValue = Object.values(serverErrors)[0];
           if (Array.isArray(firstErrorValue)) {
-            setError(firstErrorValue[0]);
+            setError(String(firstErrorValue[0]));
           } else if (typeof firstErrorValue === "string") {
             setError(firstErrorValue);
           } else {
-            setError(JSON.stringify(err.response.data));
+            setError("Invalid credentials or server error.");
           }
         }
       } else {

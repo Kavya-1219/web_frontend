@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Calendar, TrendingUp, Flame, Target, CheckCircle, XCircle, Clock, Zap } from "lucide-react";
-import { calculateDailyCalorieTarget, calculateUserMetrics, calculateStepsCalories } from "@/app/helpers/smart-health-system";
+import api, { endpoints } from "../helpers/api";
 import { MedicalDisclaimer } from "./ui/medical-disclaimer";
 
 interface DailyProgress {
@@ -23,127 +23,29 @@ export function TimelineProgressScreen() {
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [estimatedTimeline, setEstimatedTimeline] = useState(0);
   const [currentDay, setCurrentDay] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadTimelineProgress();
   }, []);
 
-  const loadTimelineProgress = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const timeline = JSON.parse(localStorage.getItem('timeline') || '{}');
-    const bodyDetails = JSON.parse(localStorage.getItem('bodyDetails') || '{}');
-    const personalDetails = JSON.parse(localStorage.getItem('personalDetails') || '{}');
-    const lifestyle = JSON.parse(localStorage.getItem('lifestyle') || '{}');
-    const userGoals = JSON.parse(localStorage.getItem('userGoals') || '[]');
-    
-    // Calculate metrics
-    const weight = parseFloat(bodyDetails.weight) || 70;
-    const height = parseFloat(bodyDetails.height) || 170;
-    const age = parseFloat(personalDetails.age) || 25;
-    const gender = personalDetails.gender || 'Male';
-    const activityLevel = lifestyle.activityLevel || 'moderate';
-    const goal = userGoals.includes('lose-weight') ? 'lose_weight' : 
-                 userGoals.includes('gain-weight') ? 'gain_weight' :
-                 userGoals.includes('gain-muscle') ? 'gain_muscle' : 'maintain_weight';
-    
-    const targetWeight = parseFloat(localStorage.getItem('targetWeight') || weight.toString());
-    const estimatedWeeks = timeline.weeks || 12;
-    const estimatedDays = estimatedWeeks * 7;
-    
-    // Calculate daily target
-    const dailyTarget = calculateDailyCalorieTarget(
-      weight,
-      height,
-      age,
-      gender,
-      activityLevel,
-      goal,
-      []
-    );
-    
-    // Get start date from timeline
-    const startDate = timeline.startDate ? new Date(timeline.startDate) : new Date();
-    const today = new Date();
-    
-    // Calculate current day
-    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
-    const currentDayNum = Math.min(daysPassed + 1, estimatedDays);
-    
-    setCurrentDay(currentDayNum);
-    setEstimatedTimeline(estimatedDays);
-    setDaysRemaining(Math.max(0, estimatedDays - currentDayNum));
-    setTotalCaloriesTarget(dailyTarget * estimatedDays);
-    
-    // Load daily progress data
-    const foodLogs = JSON.parse(localStorage.getItem(`foodLogs_${email}`) || '[]');
-    const waterLogs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    const stepsLogs = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-    const sleepLogs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    
-    // Generate timeline for all days
-    const progressData: DailyProgress[] = [];
-    let totalConsumed = 0;
-    
-    for (let day = 1; day <= estimatedDays; day++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + (day - 1));
-      const dateString = date.toDateString();
-      const todayString = today.toDateString();
+  const loadTimelineProgress = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(endpoints.timeline);
+      const data = response.data;
       
-      // Get logs for this day
-      const dayFoodLogs = foodLogs.filter((log: any) => 
-        new Date(log.timestamp).toDateString() === dateString
-      );
-      const dayWaterLogs = waterLogs.filter((log: any) => 
-        new Date(log.timestamp).toDateString() === dateString
-      );
-      const dayStepsLogs = stepsLogs.filter((log: any) => 
-        new Date(log.timestamp).toDateString() === dateString
-      );
-      const daySleepLog = sleepLogs.find((log: any) => 
-        new Date(log.timestamp).toDateString() === dateString
-      );
-      
-      // Calculate totals
-      const caloriesConsumed = dayFoodLogs.reduce((sum: number, log: any) => 
-        sum + (log.calories * log.quantity), 0
-      );
-      const waterIntake = dayWaterLogs.reduce((sum: number, log: any) => 
-        sum + log.amount, 0
-      );
-      const steps = dayStepsLogs.reduce((sum: number, log: any) => 
-        sum + log.steps, 0
-      );
-      const sleep = daySleepLog ? daySleepLog.hours : null;
-      
-      // Calculate calories burned from exercise (steps only)
-      // Water and sleep do NOT burn calories
-      const caloriesBurned = calculateStepsCalories(steps, weight);
-      
-      // Check if day is completed (within 90-110% of target)
-      const isCompleted = caloriesConsumed >= dailyTarget * 0.9 && 
-                         caloriesConsumed <= dailyTarget * 1.1;
-      
-      if (day <= currentDayNum) {
-        totalConsumed += caloriesConsumed;
-      }
-      
-      progressData.push({
-        date: dateString,
-        dayNumber: day,
-        caloriesTarget: dailyTarget,
-        caloriesConsumed: Math.round(caloriesConsumed),
-        caloriesBurned: caloriesBurned,
-        waterIntake,
-        steps,
-        sleep,
-        isCompleted,
-        isToday: dateString === todayString
-      });
+      setTimelineData(data.timelineData);
+      setTotalCaloriesTarget(data.totalCaloriesTarget);
+      setTotalCaloriesConsumed(data.totalCaloriesConsumed);
+      setDaysRemaining(data.daysRemaining);
+      setEstimatedTimeline(data.estimatedTimeline);
+      setCurrentDay(data.currentDay);
+    } catch (error) {
+      console.error("Error fetching timeline progress:", error);
+    } finally {
+      setLoading(false);
     }
-    
-    setTotalCaloriesConsumed(Math.round(totalConsumed));
-    setTimelineData(progressData);
   };
 
   const getProgressPercentage = () => {
@@ -154,6 +56,9 @@ export function TimelineProgressScreen() {
   const getOnTrackStatus = () => {
     const expectedProgress = (currentDay / estimatedTimeline) * totalCaloriesTarget;
     const actualProgress = totalCaloriesConsumed;
+    
+    if (expectedProgress === 0) return { status: "Starting", color: "text-blue-600", icon: "✨", bgColor: "bg-blue-50" };
+    
     const difference = actualProgress - expectedProgress;
     const percentDiff = (difference / expectedProgress) * 100;
     
@@ -165,6 +70,14 @@ export function TimelineProgressScreen() {
       return { status: "Behind", color: "text-orange-600", icon: "⬇", bgColor: "bg-orange-50" };
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+      </div>
+    );
+  }
 
   const trackStatus = getOnTrackStatus();
 

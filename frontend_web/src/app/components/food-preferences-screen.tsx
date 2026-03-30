@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Utensils, ArrowLeft, Check } from "lucide-react";
+import { Utensils, ArrowLeft, Check, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 const dietTypes = [
   { id: "veg", label: "Vegetarian", icon: "🥗", description: "Plant-based diet" },
@@ -25,6 +26,7 @@ export function FoodPreferencesScreen() {
   const [dietType, setDietType] = useState("");
   const [allergies, setAllergies] = useState<string[]>([]);
   const [dislikes, setDislikes] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleAllergy = (allergy: string) => {
     setAllergies(prev =>
@@ -34,14 +36,30 @@ export function FoodPreferencesScreen() {
     );
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (dietType) {
-      localStorage.setItem('foodPreferences', JSON.stringify({
-        dietType,
-        allergies,
-        dislikes
-      }));
-      navigate("/lifestyle");
+      setIsLoading(true);
+      try {
+        localStorage.setItem('foodPreferences', JSON.stringify({
+          dietType,
+          allergies,
+          dislikes
+        }));
+
+        await api.post(endpoints.foodPreferences, {
+          diet_type: dietType,
+          foodAllergies: allergies,
+          dislikes: dislikes
+        });
+
+        navigate("/lifestyle");
+      } catch (error) {
+        console.error("Failed to save food preferences:", error);
+        // Even if API fails, we proceed to the next step for now
+        navigate("/lifestyle");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -172,14 +190,21 @@ export function FoodPreferencesScreen() {
             <div className="pt-4">
               <button
                 onClick={handleContinue}
-                disabled={!dietType}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  dietType
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || !dietType}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform flex items-center justify-center ${
+                    isLoading || !dietType
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue to Lifestyle
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                    Saving Preferences...
+                  </>
+                ) : (
+                  "Continue to Lifestyle"
+                )}
               </button>
             </div>
           </div>

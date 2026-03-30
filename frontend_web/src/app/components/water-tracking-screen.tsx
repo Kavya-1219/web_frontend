@@ -1,12 +1,8 @@
 import { useState, useEffect } from "react";
-import { Droplets, Plus, Minus, Target, TrendingUp, Calendar, ArrowLeft } from "lucide-react";
+import { Droplets, Plus, Minus, Target, TrendingUp, Info } from "lucide-react";
 import { useNavigate } from "react-router";
 import api, { endpoints } from "../helpers/api";
-
-interface WaterLog {
-  amount: number;
-  timestamp: string;
-}
+import { CommonHeader } from "./common-header";
 
 export function WaterTrackingScreen() {
   const [todayWater, setTodayWater] = useState(0);
@@ -14,9 +10,14 @@ export function WaterTrackingScreen() {
   const [glassSize, setGlassSize] = useState(250);
   const [weeklyAverage, setWeeklyAverage] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchWaterData();
+
+    const handleRefresh = () => fetchWaterData();
+    window.addEventListener('refreshDashboard', handleRefresh);
+    return () => window.removeEventListener('refreshDashboard', handleRefresh);
   }, []);
 
   const fetchWaterData = async () => {
@@ -26,289 +27,190 @@ export function WaterTrackingScreen() {
       if (response.data) {
         setTodayWater(response.data.todays_water_intake || 0);
         setTargetWater(response.data.daily_water_goal || 2000);
-        // Calculate weekly avg from results if available in future
+      }
+      const weeklyResponse = await api.get(endpoints.waterWeekly);
+      if (weeklyResponse.data) {
+        setWeeklyAverage(weeklyResponse.data.weekly_average || 0);
       }
     } catch (error) {
       console.error("Water fetch failed:", error);
-      calculateTarget();
-      loadTodayWater();
     } finally {
       setIsLoading(false);
     }
-    calculateWeeklyAverage();
   };
 
-  const calculateTarget = () => {
-    const bodyDetails = JSON.parse(localStorage.getItem('bodyDetails') || '{}');
-    const weight = parseFloat(bodyDetails.weight) || 70;
-    const target = Math.round(weight * 35);
-    setTargetWater(target);
-  };
-
-  const loadTodayWater = () => {
-    const today = new Date().toDateString();
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    const todayLogs = logs.filter((log: WaterLog) => new Date(log.timestamp).toDateString() === today);
-    const total = todayLogs.reduce((sum: number, log: WaterLog) => sum + log.amount, 0);
-    setTodayWater(total);
-  };
-
-  const calculateWeeklyAverage = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const weekLogs = logs.filter((log: WaterLog) => new Date(log.timestamp) >= sevenDaysAgo);
-    const dailyTotals: { [key: string]: number } = {};
-    weekLogs.forEach((log: WaterLog) => {
-      const date = new Date(log.timestamp).toDateString();
-      dailyTotals[date] = (dailyTotals[date] || 0) + log.amount;
-    });
-    const days = Object.keys(dailyTotals).length;
-    const total = Object.values(dailyTotals).reduce((sum, amount) => sum + amount, 0);
-    setWeeklyAverage(days > 0 ? Math.round(total / days) : 0);
-  };
-
-  const addWater = async (amount: number) => {
+  const updateWater = async (amount: number) => {
     try {
-      const response = await api.post(endpoints.waterTracking, { water_amount: amount });
+      const response = await api.post(endpoints.waterTracking, { increment: amount });
       if (response.data) {
         setTodayWater(response.data.todays_water_intake);
+        const { dispatchRefresh } = await import("../helpers/api");
+        dispatchRefresh();
       }
     } catch (error) {
-      console.error("Backend add water failed, falling back to local:", error);
-      const email = localStorage.getItem('currentUserEmail');
-      const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-      logs.push({ amount, timestamp: new Date().toISOString() });
-      localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
-      setTodayWater(prev => prev + amount);
-    }
-    calculateWeeklyAverage();
-  };
-
-  const removeWater = async () => {
-    if (todayWater >= glassSize) {
-      try {
-        // Assuming backend has a remove endpoint or we just post negative
-        // For now, let's just do local logic if backend doesn't support undo directly via POST
-        // Backend view for water-tracking only has GET and POST (add)
-        // So we might need a DELETE or just keep local for undo
-        const email = localStorage.getItem('currentUserEmail');
-        const logs = JSON.parse(localStorage.getItem(`waterLogs_${email}`) || '[]');
-        const today = new Date().toDateString();
-        for (let i = logs.length - 1; i >= 0; i--) {
-          if (new Date(logs[i].timestamp).toDateString() === today) {
-            logs.splice(i, 1);
-            break;
-          }
-        }
-        localStorage.setItem(`waterLogs_${email}`, JSON.stringify(logs));
-        setTodayWater(prev => Math.max(0, prev - glassSize));
-        calculateWeeklyAverage();
-      } catch (error) {
-        console.error("Remove water failed:", error);
-      }
+      console.error("Backend add water failed:", error);
     }
   };
 
   const progress = Math.min((todayWater / targetWater) * 100, 100);
-  const glassesCount = Math.floor(todayWater / glassSize);
   const targetGlasses = Math.ceil(targetWater / glassSize);
 
-  const getMotivationMessage = () => {
-    const percentage = (todayWater / targetWater) * 100;
-    if (percentage >= 100) return "🎉 Excellent! You've met your hydration goal!";
-    if (percentage >= 75) return "💧 Almost there! Keep it up!";
-    if (percentage >= 50) return "👍 Good progress! You're halfway there!";
-    if (percentage >= 25) return "💪 Keep going! Every glass counts!";
-    return "🌟 Start your hydration journey today!";
+  const getHydrationMessage = () => {
+    if (progress >= 100) return "🎉 You're fully hydrated!";
+    if (progress >= 75) return "💧 Excellent progress! Almost there.";
+    if (progress >= 50) return "👍 Halfway there! Keep drinking.";
+    if (progress >= 25) return "💪 Great start! Keep up the momentum.";
+    return "🥤 Time for your next glass of water!";
   };
 
-  const navigate = useNavigate();
+  if (isLoading && todayWater === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-green-vibrant"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-cyan-50 dark:from-gray-900 dark:to-blue-900/20 pb-24">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-cyan-500 dark:from-blue-700 dark:to-cyan-700 pt-8 pb-20 px-6 rounded-b-[2rem]">
-        <div>
-          <div className="flex items-center space-x-3 mb-3">
-            <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
-            <Droplets className="w-8 h-8 text-white" />
-            <h1 className="text-2xl text-white font-semibold">Water Tracking</h1>
-          </div>
-          <p className="text-blue-50">Stay hydrated, stay healthy!</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+      <CommonHeader 
+        title="Water Tracking" 
+        subtitle="Stay hydrated, stay healthy!"
+        gradientClass="bg-water-gradient"
+        icon={<Droplets className="w-10 h-10 text-white/90" />}
+      />
 
-      {/* Main Card */}
-      <div className="px-6 -mt-12 space-y-6">
-        {/* Progress Circle */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative w-48 h-48">
-              <svg className="transform -rotate-90 w-48 h-48">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="relative -mt-32 z-20 space-y-8">
+          {/* Main Progress Card (Android Style) */}
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl p-10 flex flex-col items-center border border-gray-100 dark:border-gray-700">
+            {/* Water Progress Indicator (Large Circle) */}
+            <div className="relative w-64 h-64 mb-8">
+              <svg className="transform -rotate-90 w-64 h-64">
                 <circle
-                  cx="96"
-                  cy="96"
-                  r="88"
+                  cx="128"
+                  cy="128"
+                  r="110"
                   stroke="#E0F2FE"
-                  strokeWidth="16"
+                  strokeWidth="20"
                   fill="none"
+                  className="dark:stroke-gray-700"
                 />
                 <circle
-                  cx="96"
-                  cy="96"
-                  r="88"
-                  stroke="url(#gradient)"
-                  strokeWidth="16"
+                  cx="128"
+                  cy="128"
+                  r="110"
+                  stroke="url(#water-gradient-svg)"
+                  strokeWidth="20"
                   fill="none"
-                  strokeDasharray={`${2 * Math.PI * 88}`}
-                  strokeDashoffset={`${2 * Math.PI * 88 * (1 - progress / 100)}`}
+                  strokeDasharray={`${2 * Math.PI * 110}`}
+                  strokeDashoffset={`${2 * Math.PI * 110 * (1 - progress / 100)}`}
                   strokeLinecap="round"
+                  className="transition-all duration-1000 ease-out"
                 />
                 <defs>
-                  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#3B82F6" />
-                    <stop offset="100%" stopColor="#06B6D4" />
+                  <linearGradient id="water-gradient-svg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00E5FF" />
+                    <stop offset="100%" stopColor="#0072FF" />
                   </linearGradient>
                 </defs>
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Droplets className="w-12 h-12 text-blue-500 mb-2" />
-                <p className="text-4xl font-bold text-gray-800 dark:text-white">{todayWater}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">ml / {targetWater}ml</p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">{Math.round(progress)}%</p>
+                <p className="text-6xl font-black text-gray-900 dark:text-white tracking-tighter">{todayWater}</p>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">ml</p>
+                <p className="text-blue-500 font-black text-xl mt-2">{Math.round(progress)}%</p>
               </div>
             </div>
+
+            <p className="text-blue-600 dark:text-blue-400 font-bold text-lg mb-8">{getHydrationMessage()}</p>
+
+            {/* Glass Size Selector */}
+            <div className="w-full space-y-4 mb-8">
+               <div className="flex items-center justify-between px-2">
+                 <h3 className="font-black text-gray-400 uppercase tracking-widest text-xs">Glass Size Selection</h3>
+                 <span className="bg-blue-50 dark:bg-blue-900/40 text-blue-600 px-3 py-1 rounded-lg text-xs font-black">{glassSize}ml</span>
+               </div>
+               <div className="grid grid-cols-3 gap-4">
+                 {[250, 500, 750].map((size) => (
+                   <button
+                     key={size}
+                     onClick={() => setGlassSize(size)}
+                     className={`py-4 rounded-[1.5rem] font-bold transition-all transform active:scale-95 border-2 ${
+                       glassSize === size
+                         ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
+                         : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-400 hover:border-blue-200'
+                     }`}
+                   >
+                     {size}ml
+                   </button>
+                 ))}
+               </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="w-full flex gap-4">
+              <button
+                onClick={() => updateWater(-glassSize)}
+                disabled={todayWater === 0}
+                className="flex-1 py-5 rounded-[2rem] bg-gray-50 dark:bg-gray-900 text-gray-400 font-black uppercase tracking-widest hover:bg-red-50 hover:text-red-500 transition-colors flex items-center justify-center gap-2 group"
+              >
+                <Minus className="w-6 h-6 group-hover:scale-125 transition-transform" />
+                Remove
+              </button>
+              <button
+                onClick={() => updateWater(glassSize)}
+                className="flex-[2] py-5 rounded-[2rem] bg-gradient-to-r from-blue-500 to-blue-700 text-white font-black uppercase tracking-widest shadow-xl hover:shadow-blue-500/30 transition-shadow flex items-center justify-center gap-2 group"
+              >
+                <Plus className="w-6 h-6 group-hover:scale-125 transition-transform" />
+                Add {glassSize}ml
+              </button>
+            </div>
           </div>
 
-          {/* Glasses Count */}
-          <div className="text-center mb-6">
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">Today's Progress</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {glassesCount} / {targetGlasses} glasses
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">({glassSize}ml per glass)</p>
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-xl">
+                   <Target className="w-6 h-6 text-success-green" />
+                 </div>
+                 <span className="text-gray-400 font-black uppercase tracking-widest text-xs">Daily Goal</span>
+               </div>
+               <p className="text-3xl font-black text-gray-900 dark:text-white leading-none">{targetWater}ml</p>
+               <p className="text-gray-400 text-sm font-bold mt-2">{targetGlasses} glasses today</p>
+            </div>
+            
+            <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-xl border border-gray-100 dark:border-gray-700">
+               <div className="flex items-center gap-3 mb-4">
+                 <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
+                   <TrendingUp className="w-6 h-6 text-blue-500" />
+                 </div>
+                 <span className="text-gray-400 font-black uppercase tracking-widest text-xs">7-Day Avg</span>
+               </div>
+               <p className="text-3xl font-black text-gray-900 dark:text-white leading-none">{weeklyAverage}ml</p>
+               <p className="text-gray-400 text-sm font-bold mt-2">{Math.round((weeklyAverage/targetWater)*100)}% consistency</p>
+            </div>
           </div>
 
-          {/* Motivation Message */}
-          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-2xl p-4 mb-6">
-            <p className="text-center text-blue-800 dark:text-blue-300 font-medium">
-              {getMotivationMessage()}
-            </p>
-          </div>
-
-          {/* Glass Size Selector */}
-          <div className="mb-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 text-center">Glass Size</p>
-            <div className="grid grid-cols-3 gap-3">
-              {[200, 250, 300, 350, 400, 500].map((size) => (
-                <button
-                  key={size}
-                  onClick={() => setGlassSize(size)}
-                  className={`py-3 rounded-xl border-2 transition ${
-                    glassSize === size
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-300'
-                  }`}
-                >
-                  {size}ml
-                </button>
+          {/* Hydration Info Box (Android Style) */}
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center gap-3 mb-6">
+              <Info className="w-6 h-6 text-blue-500" />
+              <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Hydration Benefits</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { icon: "⚡", text: "Boosts energy levels and focus" },
+                { icon: "✨", text: "Promotes healthier, glowing skin" },
+                { icon: "🔥", text: "Supports fat burning metabolism" },
+                { icon: "🧠", text: "Enhances cognitive brain function" }
+              ].map((benefit, i) => (
+                <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">
+                  <span className="text-2xl">{benefit.icon}</span>
+                  <p className="text-sm font-bold text-gray-600 dark:text-gray-300 leading-tight">{benefit.text}</p>
+                </div>
               ))}
             </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-3">
-            <button
-              onClick={removeWater}
-              disabled={todayWater === 0}
-              className={`flex-1 py-4 rounded-xl transition flex items-center justify-center space-x-2 ${
-                todayWater > 0
-                  ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/30'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              <Minus className="w-6 h-6" />
-              <span className="font-medium">Remove</span>
-            </button>
-            
-            <button
-              onClick={() => addWater(glassSize)}
-              className="flex-[2] py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition flex items-center justify-center space-x-2"
-            >
-              <Plus className="w-6 h-6" />
-              <span className="font-medium">Add {glassSize}ml</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
-            <div className="flex items-center space-x-2 mb-3">
-              <Target className="w-5 h-5 text-green-500" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">Daily Goal</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">{targetWater}ml</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{targetGlasses} glasses</p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5">
-            <div className="flex items-center space-x-2 mb-3">
-              <TrendingUp className="w-5 h-5 text-blue-500" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">7-Day Avg</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">{weeklyAverage}ml</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {Math.round((weeklyAverage / targetWater) * 100)}% of goal
-            </p>
-          </div>
-        </div>
-
-        {/* Benefits Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <Calendar className="w-6 h-6 text-blue-500" />
-            <h3 className="font-semibold text-gray-800 dark:text-white">Benefits of Hydration</h3>
-          </div>
-          <ul className="space-y-3">
-            <li className="flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">💧</span>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Supports metabolism</strong> - Helps maintain healthy metabolic function
-              </p>
-            </li>
-            <li className="flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">💧</span>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Reduces appetite</strong> - Can help reduce hunger and support weight management
-              </p>
-            </li>
-            <li className="flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">💧</span>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Improves skin</strong> - Keeps skin hydrated and glowing
-              </p>
-            </li>
-            <li className="flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">💧</span>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Better digestion</strong> - Aids nutrient absorption and digestion
-              </p>
-            </li>
-            <li className="flex items-start space-x-3">
-              <span className="text-blue-500 mt-0.5">💧</span>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <strong>Energy boost</strong> - Prevents fatigue and improves focus
-              </p>
-            </li>
-          </ul>
-          <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
-            <p className="text-xs text-blue-700 dark:text-blue-300 italic">
-              💡 Note: Water doesn't directly burn calories, but staying hydrated supports overall health and weight management.
-            </p>
           </div>
         </div>
       </div>

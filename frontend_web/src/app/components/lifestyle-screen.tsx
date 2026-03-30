@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Activity, ArrowLeft, Check } from "lucide-react";
+import { Activity, ArrowLeft, Check, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 const activityLevels = [
   {
@@ -40,15 +41,29 @@ const activityLevels = [
 export function LifestyleScreen() {
   const navigate = useNavigate();
   const [activityLevel, setActivityLevel] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (activityLevel) {
-      const selectedActivity = activityLevels.find(a => a.id === activityLevel);
-      localStorage.setItem('lifestyle', JSON.stringify({
-        activityLevel,
-        multiplier: selectedActivity?.multiplier || 1.2
-      }));
-      navigate("/health-goal");
+      setIsLoading(true);
+      try {
+        const selectedActivity = activityLevels.find(a => a.id === activityLevel);
+        localStorage.setItem('lifestyle', JSON.stringify({
+          activityLevel,
+          multiplier: selectedActivity?.multiplier || 1.2
+        }));
+
+        await api.post(endpoints.lifestyle, {
+          activityLevel: activityLevel,
+        });
+
+        navigate("/health-goal");
+      } catch (error) {
+        console.error("Failed to save lifestyle:", error);
+        navigate("/health-goal");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -141,14 +156,21 @@ export function LifestyleScreen() {
             <div className="pt-4">
               <button
                 onClick={handleContinue}
-                disabled={!activityLevel}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  activityLevel
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-300 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || !activityLevel}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform flex items-center justify-center ${
+                  isLoading || !activityLevel
+                    ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue to Goals
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                    Saving Lifestyle...
+                  </>
+                ) : (
+                  "Continue to Goals"
+                )}
               </button>
             </div>
           </div>

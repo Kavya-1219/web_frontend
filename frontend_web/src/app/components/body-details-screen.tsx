@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Scale, ArrowLeft } from "lucide-react";
+import { Scale, ArrowLeft, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 export function BodyDetailsScreen() {
   const navigate = useNavigate();
@@ -8,36 +9,49 @@ export function BodyDetailsScreen() {
   const [weight, setWeight] = useState("");
   const [heightUnit, setHeightUnit] = useState<"cm" | "ft">("cm");
   const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (height && weight) {
-      // Convert to standard units (cm and kg)
-      let heightInCm = parseFloat(height);
-      let weightInKg = parseFloat(weight);
-      
-      if (heightUnit === "ft") {
-        heightInCm = heightInCm * 30.48; // feet to cm
-      }
-      if (weightUnit === "lbs") {
-        weightInKg = weightInKg * 0.453592; // lbs to kg
-      }
+      setIsLoading(true);
+      try {
+        // Convert to standard units (cm and kg)
+        let heightInCm = parseFloat(height);
+        let weightInKg = parseFloat(weight);
+        
+        if (heightUnit === "ft") {
+          heightInCm = heightInCm * 30.48; // feet to cm
+        }
+        if (weightUnit === "lbs") {
+          weightInKg = weightInKg * 0.453592; // lbs to kg
+        }
 
-      // Calculate BMI
-      const heightInM = heightInCm / 100;
-      const bmi = (weightInKg / (heightInM * heightInM)).toFixed(1);
+        // Calculate BMI
+        const heightInM = heightInCm / 100;
+        const bmi = (weightInKg / (heightInM * heightInM)).toFixed(1);
 
-      localStorage.setItem('bodyDetails', JSON.stringify({
-        height: heightInCm,
-        weight: weightInKg,
-        bmi,
-        heightUnit,
-        weightUnit
-      }));
-      
-      // Also store weight separately for later use
-      localStorage.setItem('userWeight', weightInKg.toString());
-      
-      navigate("/food-preferences");
+        localStorage.setItem('bodyDetails', JSON.stringify({
+          height: heightInCm,
+          weight: weightInKg,
+          bmi,
+          heightUnit,
+          weightUnit
+        }));
+        
+        localStorage.setItem('userWeight', weightInKg.toString());
+
+        await api.post(endpoints.bodyDetails, {
+          height: heightInCm,
+          weight: weightInKg,
+        });
+        
+        navigate("/food-preferences");
+      } catch (error) {
+        console.error("Failed to save body details:", error);
+        navigate("/food-preferences");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -230,14 +244,21 @@ export function BodyDetailsScreen() {
             <div className="pt-4">
               <button
                 onClick={handleContinue}
-                disabled={!height || !weight}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  height && weight
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || !height || !weight}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform flex items-center justify-center ${
+                  isLoading || !height || !weight
+                    ? "bg-gray-300 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue to Food Preferences
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                    Saving Details...
+                  </>
+                ) : (
+                  "Continue to Food Preferences"
+                )}
               </button>
             </div>
           </div>

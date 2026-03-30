@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, ArrowLeft, Apple } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
+
 
 export function ForgotPasswordScreen() {
   const navigate = useNavigate();
@@ -9,7 +11,7 @@ export function ForgotPasswordScreen() {
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [generatedOtp, setGeneratedOtp] = useState("");
+
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,52 +22,35 @@ export function ForgotPasswordScreen() {
   const [success, setSuccess] = useState("");
 
   // STEP 1 – Send OTP
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const users = JSON.parse(localStorage.getItem("registeredUsers") || "[]");
-
-    const user = users.find(
-      (u: any) => u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (!user) {
-      setError("Email not registered.");
-      return;
+    try {
+      await api.post(endpoints.forgotPassword, { email });
+      setStep(2);
+    } catch (err: any) {
+      console.error("Forgot password error:", err);
+      setError(err.response?.data?.error || "Email not registered or error sending OTP.");
     }
-
-    const otpValue = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // store OTP temporarily
-    localStorage.setItem("resetOtp", otpValue);
-    localStorage.setItem("resetEmail", email);
-
-    setGeneratedOtp(otpValue);
-
-    // 👉 simulate mail sending
-    alert("OTP sent to your mail (demo): " + otpValue);
-
-    setStep(2);
   };
 
   // STEP 2 – Verify OTP
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const savedOtp = localStorage.getItem("resetOtp");
-
-    if (otp !== savedOtp) {
-      setError("Invalid OTP");
-      return;
+    try {
+      await api.post(endpoints.verifyOtp, { email, otp });
+      setStep(3);
+    } catch (err: any) {
+      console.error("Verify OTP error:", err);
+      setError(err.response?.data?.error || "Invalid OTP");
     }
-
-    setStep(3);
   };
 
   // STEP 3 – Change password
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -74,25 +59,23 @@ export function ForgotPasswordScreen() {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("registeredUsers") || "[]");
-    const resetEmail = localStorage.getItem("resetEmail");
+    try {
+      await api.post(endpoints.resetPassword, { 
+        email, 
+        otp, 
+        password: newPassword, 
+        confirm_password: confirmPassword 
+      });
 
-    const updatedUsers = users.map((u: any) => {
-      if (u.email.toLowerCase() === resetEmail?.toLowerCase()) {
-        return { ...u, password: newPassword };
-      }
-      return u;
-    });
+      setSuccess("Password updated successfully");
 
-    localStorage.setItem("registeredUsers", JSON.stringify(updatedUsers));
-    localStorage.removeItem("resetOtp");
-    localStorage.removeItem("resetEmail");
-
-    setSuccess("Password updated successfully");
-
-    setTimeout(() => {
-      navigate("/login");
-    }, 1500);
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      setError(err.response?.data?.error || "Failed to reset password.");
+    }
   };
 
   return (

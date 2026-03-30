@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { Target, TrendingDown, TrendingUp, Calendar, ArrowLeft, AlertCircle, Check } from "lucide-react";
+import { Target, TrendingDown, TrendingUp, Calendar, ArrowLeft, AlertCircle, Check, Loader2 } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
 
 export function GoalWeightScreen() {
   const navigate = useNavigate();
   const [targetWeight, setTargetWeight] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
+  const [isLoading, setIsLoading] = useState(false);
   const [currentWeight, setCurrentWeight] = useState(0);
   const [selectedTimeline, setSelectedTimeline] = useState("");
   const [estimatedWeeks, setEstimatedWeeks] = useState(0);
@@ -83,16 +86,29 @@ export function GoalWeightScreen() {
 
   const timelineOptions = getTimelineOptions();
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (targetWeight && selectedTimeline) {
-      const selected = timelineOptions.find(opt => opt.id === selectedTimeline);
-      localStorage.setItem('targetWeight', targetWeight);
-      localStorage.setItem('timeline', JSON.stringify({
-        weeks: selected?.weeks,
-        pace: selected?.pace,
-        targetDate: new Date(Date.now() + (selected?.weeks || 0) * 7 * 24 * 60 * 60 * 1000).toISOString()
-      }));
-      navigate("/health-conditions");
+      setIsLoading(true);
+      try {
+        const selected = timelineOptions.find(opt => opt.id === selectedTimeline);
+        localStorage.setItem('targetWeight', targetWeight);
+        localStorage.setItem('timeline', JSON.stringify({
+          weeks: selected?.weeks,
+          pace: selected?.pace,
+          targetDate: new Date(Date.now() + (selected?.weeks || 0) * 7 * 24 * 60 * 60 * 1000).toISOString()
+        }));
+
+        await api.post(endpoints.goalWeight, {
+          targetWeight: parseFloat(targetWeight),
+        });
+
+        navigate("/health-conditions");
+      } catch (error) {
+        console.error("Failed to save goal weight:", error);
+        navigate("/health-conditions");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -254,17 +270,24 @@ export function GoalWeightScreen() {
             )}
 
             {/* Continue Button */}
-            <div className="pt-6">
+            <div className="pt-4">
               <button
                 onClick={handleContinue}
-                disabled={!targetWeight || !selectedTimeline}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  targetWeight && selectedTimeline
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || !targetWeight || !selectedTimeline}
+                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform flex items-center justify-center ${
+                  isLoading || !targetWeight || !selectedTimeline
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue to Health Profile
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+                    Saving Target...
+                  </>
+                ) : (
+                  "Continue to Health Conditions"
+                )}
               </button>
             </div>
           </div>

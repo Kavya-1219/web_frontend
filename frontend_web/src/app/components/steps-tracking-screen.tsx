@@ -1,594 +1,274 @@
 import { useState, useEffect } from "react";
-import { Footprints, Plus, Target, TrendingUp, Calendar, ArrowLeft, Award, Flame, Trash2, List, Minus, X } from "lucide-react";
+import { Footprints, Plus, Minus, Target, TrendingUp, Flame, Map, Settings, Info, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import api, { endpoints } from "../helpers/api";
-
-interface StepsLog {
-  steps: number;
-  timestamp: string;
-  id: string;
-  source: 'manual' | 'auto';
-}
+import { CommonHeader } from "./common-header";
 
 export function StepsTrackingScreen() {
   const [todaySteps, setTodaySteps] = useState(0);
   const [targetSteps, setTargetSteps] = useState(10000);
   const [weeklyAverage, setWeeklyAverage] = useState(0);
-  const [manualSteps, setManualSteps] = useState("");
-  const [removeSteps, setRemoveSteps] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [showLogsModal, setShowLogsModal] = useState(false);
-  const [todayLogs, setTodayLogs] = useState<StepsLog[]>([]);
   const [autoTracking, setAutoTracking] = useState(false);
-  const [showMessage, setShowMessage] = useState(false);
-  const [messageText, setMessageText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [userWeight, setUserWeight] = useState(70);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [manualStepsInput, setManualStepsInput] = useState("");
+  
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchStepsData();
-    loadAutoTrackingSetting();
-    startAutoTracking();
+
+    const handleRefresh = () => fetchStepsData();
+    window.addEventListener('refreshDashboard', handleRefresh);
+    return () => window.removeEventListener('refreshDashboard', handleRefresh);
   }, []);
 
   const fetchStepsData = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/steps/");
+      const response = await api.get(endpoints.stepsToday);
       if (response.data) {
-        setTodaySteps(response.data.todays_steps || 0);
+        setTodaySteps(response.data.todaysSteps || response.data.todays_steps || response.data.total_steps || 0);
         setTargetSteps(response.data.daily_step_goal || 10000);
+      }
+      
+      const weeklyResponse = await api.get(endpoints.stepsWeekly);
+      if (weeklyResponse.data) {
+        setWeeklyAverage(weeklyResponse.data.avg_7_day || 0);
+      }
+
+      const profileResponse = await api.get(endpoints.profile);
+      if (profileResponse.data) {
+        setUserWeight(profileResponse.data.weight || profileResponse.data.currentWeight || 70);
       }
     } catch (error) {
       console.error("Steps fetch failed:", error);
-      loadTargetSteps();
-      loadTodaySteps();
     } finally {
       setIsLoading(false);
     }
-    calculateWeeklyAverage();
   };
 
-  useEffect(() => {
-    if (autoTracking) {
-      const interval = setInterval(() => {
-        addAutoSteps();
-      }, 300000);
-      return () => clearInterval(interval);
-    }
-  }, [autoTracking]);
-
-  const loadAutoTrackingSetting = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const saved = localStorage.getItem(`autoTracking_${email}`);
-    if (saved === 'true') setAutoTracking(true);
-  };
-
-  const toggleAutoTracking = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const newValue = !autoTracking;
-    setAutoTracking(newValue);
-    localStorage.setItem(`autoTracking_${email}`, String(newValue));
-    
-    if (newValue) {
-      localStorage.setItem(`lastAutoTrack_${email}`, String(Date.now()));
-      addAutoSteps();
-    }
-  };
-
-  const addAutoSteps = async () => {
-    const randomSteps = Math.floor(Math.random() * 150) + 50;
+  const syncSteps = async (delta: number) => {
     try {
-      const response = await api.post("/steps/", { step_count: randomSteps });
+      const response = await api.post(endpoints.stepsManualLog, { 
+        delta_steps: delta,
+        steps: delta // Some backend versions might expect 'steps'
+      });
       if (response.data) {
-        setTodaySteps(response.data.todays_steps);
+        const updatedSteps = response.data.todaysSteps || 
+                           response.data.todays_steps || 
+                           response.data.total_steps || 
+                           response.data.steps || 0;
+        setTodaySteps(updatedSteps);
+        const { dispatchRefresh } = await import("../helpers/api");
+        dispatchRefresh();
       }
     } catch (error) {
-      console.error("Auto tracking backend sync failed:", error);
-      const email = localStorage.getItem('currentUserEmail');
-      const logs = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-      logs.push({
-        steps: randomSteps,
-        timestamp: new Date().toISOString(),
-        id: Date.now().toString(),
-        source: 'auto'
-      });
-      localStorage.setItem(`stepsLogs_${email}`, JSON.stringify(logs));
-      loadTodaySteps();
-    }
-    calculateWeeklyAverage();
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const startAutoTracking = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const saved = localStorage.getItem(`autoTracking_${email}`);
-    if (saved === 'true') {
-      const lastCheck = localStorage.getItem(`lastAutoTrack_${email}`);
-      const now = Date.now();
-      
-      if (lastCheck) {
-        const timeDiff = now - parseInt(lastCheck);
-        const intervals = Math.floor(timeDiff / 300000);
-        
-        if (intervals > 0 && intervals < 100) {
-          const logs = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-          
-          for (let i = 0; i < intervals; i++) {
-            const randomSteps = Math.floor(Math.random() * 150) + 50;
-            logs.push({
-              steps: randomSteps,
-              timestamp: new Date(parseInt(lastCheck) + (i * 300000)).toISOString(),
-              id: `${Date.now()}_${i}`,
-              source: 'auto'
-            });
-            // We don't sync all catch-up steps to backend for now to avoid multiple requests
-          }
-          
-          localStorage.setItem(`stepsLogs_${email}`, JSON.stringify(logs));
-          loadTodaySteps();
-          calculateWeeklyAverage();
-        }
-      }
-      
-      localStorage.setItem(`lastAutoTrack_${email}`, String(now));
+      console.error("Steps sync failed:", error);
     }
   };
 
-  const loadTargetSteps = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const saved = localStorage.getItem(`stepsTarget_${email}`);
-    if (saved) setTargetSteps(parseInt(saved));
-  };
-
-  const loadTodaySteps = () => {
-    const today = new Date().toDateString();
-    const email = localStorage.getItem('currentUserEmail');
-    const logs: StepsLog[] = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-    
-    const todayLogs = logs.filter((log) => 
-      new Date(log.timestamp).toDateString() === today
-    );
-    
-    const total = todayLogs.reduce((sum, log) => sum + log.steps, 0);
-    setTodaySteps(total);
-    setTodayLogs(todayLogs);
-  };
-
-  const calculateWeeklyAverage = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs: StepsLog[] = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-    
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
-    const weekLogs = logs.filter((log) => 
-      new Date(log.timestamp) >= sevenDaysAgo
-    );
-    
-    const dailyTotals: { [key: string]: number } = {};
-    weekLogs.forEach((log) => {
-      const date = new Date(log.timestamp).toDateString();
-      dailyTotals[date] = (dailyTotals[date] || 0) + log.steps;
-    });
-    
-    const days = Object.keys(dailyTotals).length;
-    const total = Object.values(dailyTotals).reduce((sum, steps) => sum + steps, 0);
-    setWeeklyAverage(days > 0 ? Math.round(total / days) : 0);
-  };
-
-  const addSteps = (steps: number) => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-    
-    logs.push({
-      steps,
-      timestamp: new Date().toISOString(),
-      id: Date.now().toString(),
-      source: 'manual'
-    });
-    
-    localStorage.setItem(`stepsLogs_${email}`, JSON.stringify(logs));
-    loadTodaySteps();
-    calculateWeeklyAverage();
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const removeStepsLog = (logId: string) => {
-    const email = localStorage.getItem('currentUserEmail');
-    const logs: StepsLog[] = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-    
-    const filteredLogs = logs.filter(log => log.id !== logId);
-    localStorage.setItem(`stepsLogs_${email}`, JSON.stringify(filteredLogs));
-    loadTodaySteps();
-    calculateWeeklyAverage();
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const handleManualAdd = () => {
-    const steps = parseInt(manualSteps);
-    if (steps > 0 && steps <= 50000) {
-      addSteps(steps);
-      setManualSteps("");
+  const handleAddSteps = () => {
+    const val = parseInt(manualStepsInput);
+    if (!isNaN(val) && val > 0) {
+      syncSteps(val);
+      setManualStepsInput("");
       setShowAddModal(false);
-      setMessageText(`✅ ${steps.toLocaleString()} steps added successfully!`);
-      setShowMessage(true);
-      setTimeout(() => setShowMessage(false), 3000);
     }
   };
-
-  const updateTarget = (newTarget: number) => {
-    const email = localStorage.getItem('currentUserEmail');
-    localStorage.setItem(`stepsTarget_${email}`, String(newTarget));
-    setTargetSteps(newTarget);
-  };
-
-  // Get user weight for accurate calorie calculation
-  const bodyDetails = JSON.parse(localStorage.getItem('bodyDetails') || '{}');
-  const userWeight = parseFloat(bodyDetails.weight) || 70; // default 70kg if not available
 
   const progress = Math.min((todaySteps / targetSteps) * 100, 100);
-  // Use weight-based calculation: (steps / 1000) × (weight_kg × 0.4)
   const caloriesBurned = Math.round((todaySteps / 1000) * (userWeight * 0.4));
   const distanceKm = (todaySteps * 0.000762).toFixed(2);
 
-  const getMotivationMessage = () => {
-    const percentage = (todaySteps / targetSteps) * 100;
-    if (percentage >= 100) return "🏆 Amazing! You've crushed your goal!";
-    if (percentage >= 75) return "🔥 So close! Just a bit more!";
-    if (percentage >= 50) return "💪 Halfway there! Keep moving!";
-    if (percentage >= 25) return "👟 Great start! Every step counts!";
-    return "🌟 Let's get moving today!";
+  const getAchievement = () => {
+    if (todaySteps >= 15000) return "Super Active";
+    if (todaySteps >= 10000) return "Very Active";
+    if (todaySteps >= 7500) return "Active";
+    return "Getting Started";
   };
 
-  const getAchievementLevel = () => {
-    if (todaySteps >= 15000) return { title: "Super Active", color: "text-purple-600", bg: "bg-purple-50" };
-    if (todaySteps >= 10000) return { title: "Very Active", color: "text-green-600", bg: "bg-green-50" };
-    if (todaySteps >= 7500) return { title: "Active", color: "text-blue-600", bg: "bg-blue-50" };
-    if (todaySteps >= 5000) return { title: "Moderate", color: "text-yellow-600", bg: "bg-yellow-50" };
-    return { title: "Getting Started", color: "text-gray-600", bg: "bg-gray-50" };
-  };
-
-  const achievement = getAchievementLevel();
-  const navigate = useNavigate();
+  if (isLoading && todaySteps === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-steps-gradient"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-50 dark:from-gray-900 dark:to-green-900/20 pb-24">
-      <div className="bg-gradient-to-r from-green-500 to-emerald-500 dark:from-green-700 dark:to-emerald-700 pt-8 pb-20 px-6 rounded-b-[2rem]">
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-3">
-              <ArrowLeft className="w-8 h-8 text-white cursor-pointer" onClick={() => navigate('/app')} />
-              <Footprints className="w-8 h-8 text-white" />
-              <h1 className="text-2xl text-white font-semibold">Steps Tracking</h1>
-            </div>
-            <button
-              onClick={() => setShowLogsModal(true)}
-              className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center hover:bg-white/30 transition"
-            >
-              <List className="w-6 h-6 text-white" />
-            </button>
-          </div>
-          <p className="text-green-50">Every step brings you closer!</p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+      <CommonHeader 
+        title="Steps Tracking" 
+        subtitle="Every step brings you closer!"
+        gradientClass="bg-steps-gradient"
+        icon={<Footprints className="w-10 h-10 text-white/90" />}
+      />
 
-      <div className="px-6 -mt-12 space-y-6">
-        {/* Auto-Tracking Toggle */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className={`w-12 h-12 rounded-xl ${autoTracking ? 'bg-green-100' : 'bg-gray-100'} flex items-center justify-center`}>
-                <Footprints className={`w-6 h-6 ${autoTracking ? 'text-green-600' : 'text-gray-400'}`} />
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="relative -mt-32 z-20 space-y-8">
+          
+          {/* Auto Tracking Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-xl p-6 border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`p-4 rounded-2xl ${autoTracking ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-400'}`}>
+                   <Settings className="w-6 h-6" />
+                </div>
+                <div>
+                   <h3 className="font-black text-gray-900 dark:text-white">Auto Tracking</h3>
+                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    {autoTracking ? 'Tracking is ON' : 'Enable for auto logs'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-gray-800 dark:text-white">Auto-Tracking</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {autoTracking ? 'Tracking active' : 'Enable to track automatically'}
-                </p>
-              </div>
+              <button 
+                onClick={() => setAutoTracking(!autoTracking)}
+                className={`relative w-14 h-8 rounded-full transition-colors ${autoTracking ? 'bg-success-green' : 'bg-gray-200'}`}
+              >
+                <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${autoTracking ? 'translate-x-6' : ''}`} />
+              </button>
             </div>
-            <button
-              onClick={toggleAutoTracking}
-              className={`relative w-14 h-8 rounded-full transition ${
-                autoTracking ? 'bg-green-500' : 'bg-gray-300'
-              }`}
-            >
-              <div
-                className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform ${
-                  autoTracking ? 'translate-x-7' : 'translate-x-1'
-                }`}
-              />
-            </button>
           </div>
-        </div>
 
-        {/* Progress Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative w-48 h-48">
-              <svg className="transform -rotate-90 w-48 h-48">
-                <circle cx="96" cy="96" r="88" stroke="#D1FAE5" strokeWidth="16" fill="none" />
+          {/* Progress Card (Android Style) */}
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-2xl p-10 flex flex-col items-center border border-gray-100 dark:border-gray-700">
+            <div className="relative w-64 h-64 mb-8">
+              <svg className="transform -rotate-90 w-64 h-64">
                 <circle
-                  cx="96"
-                  cy="96"
-                  r="88"
-                  stroke="url(#stepsGradient)"
-                  strokeWidth="16"
+                  cx="128"
+                  cy="128"
+                  r="110"
+                  stroke="#F3E8FF"
+                  strokeWidth="20"
                   fill="none"
-                  strokeDasharray={`${2 * Math.PI * 88}`}
-                  strokeDashoffset={`${2 * Math.PI * 88 * (1 - progress / 100)}`}
+                  className="dark:stroke-gray-700"
+                />
+                <circle
+                  cx="128"
+                  cy="128"
+                  r="110"
+                  stroke="url(#steps-gradient-svg)"
+                  strokeWidth="20"
+                  fill="none"
+                  strokeDasharray={`${2 * Math.PI * 110}`}
+                  strokeDashoffset={`${2 * Math.PI * 110 * (1 - progress / 100)}`}
                   strokeLinecap="round"
+                  className="transition-all duration-1000 ease-out"
                 />
                 <defs>
-                  <linearGradient id="stepsGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#10B981" />
-                    <stop offset="100%" stopColor="#059669" />
+                  <linearGradient id="steps-gradient-svg" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00C853" />
+                    <stop offset="100%" stopColor="#B2FF59" />
                   </linearGradient>
                 </defs>
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Footprints className="w-12 h-12 text-green-500 mb-2" />
-                <p className="text-4xl font-bold text-gray-800 dark:text-white">{todaySteps.toLocaleString()}</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">steps</p>
-                <p className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">{Math.round(progress)}%</p>
+                <p className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">{todaySteps.toLocaleString()}</p>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">steps</p>
+                <p className="text-success-green font-black text-lg mt-1">{Math.round(progress)}%</p>
               </div>
             </div>
-          </div>
 
-          <div className={`${achievement.bg} dark:bg-opacity-20 border-2 border-current rounded-2xl p-4 mb-6`}>
-            <div className="flex items-center justify-center space-x-2">
-              <Award className={`w-6 h-6 ${achievement.color}`} />
-              <p className={`font-semibold ${achievement.color}`}>{achievement.title}</p>
+            <div className="w-full bg-green-50 dark:bg-green-900/20 border-2 border-green-100 dark:border-green-800 rounded-3xl p-5 flex items-center justify-center gap-3">
+              <span className="text-2xl">🏅</span>
+              <p className="text-success-green font-black uppercase tracking-widest text-lg">{getAchievement()}</p>
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800 rounded-2xl p-4 mb-6">
-            <p className="text-center text-green-800 dark:text-green-300 font-medium">
-              {getMotivationMessage()}
-            </p>
+          {/* Stats Bar */}
+          <div className="grid grid-cols-3 gap-4">
+             <StatBox icon={<Flame className="w-6 h-6 text-warning-orange" />} value={caloriesBurned} label="kcal" />
+             <StatBox icon={<Map className="w-6 h-6 text-blue-500" />} value={distanceKm} label="km" />
+             <StatBox icon={<TrendingUp className="w-6 h-6 text-success-green" />} value={weeklyAverage} label="7-day avg" />
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mb-6">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
-              <Flame className="w-5 h-5 text-orange-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800 dark:text-white">{caloriesBurned}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">kcal</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
-              <Target className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800 dark:text-white">{distanceKm}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">km</p>
-            </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3 text-center">
-              <TrendingUp className="w-5 h-5 text-purple-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-gray-800 dark:text-white">{weeklyAverage.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">7-day avg</p>
-            </div>
+          {/* Action Buttons */}
+          <div className="flex gap-4">
+            <button
+               onClick={() => syncSteps(-1000)}
+               disabled={todaySteps < 1000}
+               className="flex-1 py-5 rounded-[2rem] bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 text-gray-400 font-black uppercase tracking-widest hover:border-red-200 hover:text-red-500 transition-all flex items-center justify-center gap-2"
+            >
+              <Minus className="w-5 h-5" />
+              Remove
+            </button>
+            <button
+               onClick={() => setShowAddModal(true)}
+               className="flex-[2] py-5 rounded-[2rem] bg-gradient-to-r from-success-green to-emerald-500 text-white font-black uppercase tracking-widest shadow-xl hover:shadow-green-500/30 transition-all flex items-center justify-center gap-2 group"
+            >
+              <Plus className="w-6 h-6 group-hover:scale-125 transition-transform" />
+              Add Steps
+            </button>
           </div>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:shadow-lg transition flex items-center justify-center space-x-2 mb-3"
-          >
-            <Plus className="w-6 h-6" />
-            <span className="font-medium">Add Steps</span>
-          </button>
-          
-          <button
-            onClick={() => setShowRemoveModal(true)}
-            className="w-full py-4 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center justify-center space-x-2"
-          >
-            <Minus className="w-6 h-6" />
-            <span className="font-medium">Remove Steps</span>
-          </button>
-        </div>
-
-        {/* Tips Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
-          <h3 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center space-x-2">
-            <span>💡</span>
-            <span>Tips to Increase Steps</span>
-          </h3>
-          <ul className="space-y-3">
-            {[
-              "Take the stairs instead of elevators",
-              "Park farther away from entrances",
-              "Take short walking breaks every hour",
-              "Walk while talking on the phone"
-            ].map((tip, idx) => (
-              <li key={idx} className="flex items-start space-x-3">
-                <span className="text-green-500 mt-0.5">👟</span>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{tip}</p>
-              </li>
-            ))}
-          </ul>
+          {/* Tips Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] p-8 shadow-xl border border-gray-100 dark:border-gray-700">
+             <div className="flex items-center gap-3 mb-6">
+                <Info className="w-6 h-6 text-success-green" />
+                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Tips to Increase Steps</h3>
+             </div>
+             <div className="space-y-4">
+                {[
+                  "Take the stairs instead of elevators",
+                  "Park farther away from entrances",
+                  "Take short walking breaks every hour",
+                  "Walk while talking on the phone"
+                ].map((tip, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl group hover:bg-green-50 transition-colors">
+                     <CheckCircle2 className="w-5 h-5 text-gray-300 group-hover:text-success-green transition-colors" />
+                     <p className="text-sm font-bold text-gray-600 dark:text-gray-300">{tip}</p>
+                  </div>
+                ))}
+             </div>
+          </div>
         </div>
       </div>
 
       {/* Add Steps Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="w-full bg-white dark:bg-gray-800 rounded-t-3xl p-6">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Add Steps Manually</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              Be genuine 😊 Manual entry is only for times you walked without your phone.
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Adding fake steps is like faking yourself — not others.
-            </p>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-300">
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Manual Log</h2>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-8">Be genuine, every step counts!</p>
             
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Number of steps</label>
-            <input
+            <input 
               type="number"
-              value={manualSteps}
-              onChange={(e) => setManualSteps(e.target.value)}
-              placeholder="Enter number of steps"
-              className="w-full px-4 py-4 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl focus:border-green-500 focus:outline-none text-lg mb-4"
+              value={manualStepsInput}
+              onChange={(e) => setManualStepsInput(e.target.value)}
+              placeholder="Enter steps count"
+              className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-2xl p-6 text-3xl font-black text-center focus:border-success-green outline-none transition-colors mb-8"
               autoFocus
             />
 
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {[1000, 2500, 5000].map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => setManualSteps(String(preset))}
-                  className="py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition"
-                >
-                  +{preset}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setManualSteps("");
-                }}
-                className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleManualAdd}
-                disabled={!manualSteps || parseInt(manualSteps) <= 0}
-                className={`flex-1 py-4 rounded-xl transition font-medium ${
-                  manualSteps && parseInt(manualSteps) > 0
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:shadow-lg'
-                    : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Add
-              </button>
+            <div className="flex gap-4">
+               <button 
+                 onClick={() => setShowAddModal(false)}
+                 className="flex-1 py-5 rounded-[1.5rem] font-black uppercase text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors"
+               >
+                 Cancel
+               </button>
+               <button 
+                 onClick={handleAddSteps}
+                 className="flex-[2] py-5 rounded-[1.5rem] font-black uppercase text-white bg-success-green shadow-lg shadow-green-500/20 hover:scale-[1.02] transition-all"
+               >
+                 Log Steps
+               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Logs Modal */}
-      {showLogsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="w-full bg-white dark:bg-gray-800 rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Today's Steps Logs</h2>
-            
-            {todayLogs.length === 0 ? (
-              <p className="text-center text-gray-500 dark:text-gray-400 py-8">No steps recorded today</p>
-            ) : (
-              <div className="space-y-3 mb-6">
-                {todayLogs.map(log => (
-                  <div key={log.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-4 rounded-xl">
-                    <div className="flex items-center space-x-3">
-                      <Footprints className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-medium text-gray-800 dark:text-white">{log.steps.toLocaleString()} steps</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(log.timestamp).toLocaleTimeString()} • {log.source === 'auto' ? 'Auto' : 'Manual'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => removeStepsLog(log.id)}
-                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowLogsModal(false)}
-              className="w-full py-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Remove Steps Modal */}
-      {showRemoveModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="w-full bg-white dark:bg-gray-800 rounded-t-3xl p-6">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">Remove Steps</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Use this only if you accidentally added extra steps.
-            </p>
-            
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Steps to remove</label>
-            <input
-              type="number"
-              value={removeSteps}
-              onChange={(e) => setRemoveSteps(e.target.value)}
-              placeholder="Enter number of steps"
-              className="w-full px-4 py-4 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-white rounded-xl focus:border-red-500 focus:outline-none text-lg mb-6"
-              autoFocus
-            />
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowRemoveModal(false);
-                  setRemoveSteps("");
-                }}
-                className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const steps = parseInt(removeSteps);
-                  if (steps > 0 && steps <= todaySteps) {
-                    const email = localStorage.getItem('currentUserEmail');
-                    const logs = JSON.parse(localStorage.getItem(`stepsLogs_${email}`) || '[]');
-                    
-                    // Add a negative entry to remove steps
-                    logs.push({
-                      steps: -steps,
-                      timestamp: new Date().toISOString(),
-                      id: Date.now().toString(),
-                      source: 'manual'
-                    });
-                    
-                    localStorage.setItem(`stepsLogs_${email}`, JSON.stringify(logs));
-                    loadTodaySteps();
-                    calculateWeeklyAverage();
-                    window.dispatchEvent(new Event('storage'));
-                    setRemoveSteps("");
-                    setShowRemoveModal(false);
-                    setMessageText(`✅ ${steps.toLocaleString()} steps removed successfully!`);
-                    setShowMessage(true);
-                    setTimeout(() => setShowMessage(false), 3000);
-                  }
-                }}
-                disabled={!removeSteps || parseInt(removeSteps) <= 0 || parseInt(removeSteps) > todaySteps}
-                className={`flex-1 py-4 rounded-xl transition ${
-                  removeSteps && parseInt(removeSteps) > 0 && parseInt(removeSteps) <= todaySteps
-                    ? 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:shadow-lg'
-                    : 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Message Snackbar */}
-      {showMessage && (
-        <div className="fixed bottom-4 left-4 right-4 bg-green-500 text-white px-4 py-3 rounded shadow-md flex items-center justify-between z-50">
-          <p className="text-sm">{messageText}</p>
-          <button
-            onClick={() => setShowMessage(false)}
-            className="text-white hover:text-gray-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+function StatBox({ icon, value, label }: { icon: React.ReactNode; value: string | number; label: string }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-[2rem] shadow-lg border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center transform transition-transform hover:scale-105">
+      <div className="mb-3">{icon}</div>
+      <p className="text-xl font-black text-gray-900 dark:text-white leading-none">{value}</p>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">{label}</p>
     </div>
   );
 }

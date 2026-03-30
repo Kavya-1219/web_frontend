@@ -83,12 +83,23 @@ export function SignUpScreen() {
       }
     } catch (err: any) {
       console.error("Registration failed:", err);
-      if (err.response?.data?.email) {
-        setErrors(prev => ({ ...prev, email: err.response.data.email[0] }));
-      } else if (err.response?.data?.username) {
-        setErrors(prev => ({ ...prev, email: "This email is already in use." }));
+      if (err.response?.data && typeof err.response.data === 'object') {
+        const serverErrors = err.response.data;
+        const newErrors = { ...errors };
+        
+        if (serverErrors.email) newErrors.email = Array.isArray(serverErrors.email) ? serverErrors.email[0] : serverErrors.email;
+        if (serverErrors.username) newErrors.email = "This email is already in use.";
+        if (serverErrors.password) newErrors.password = Array.isArray(serverErrors.password) ? serverErrors.password[0] : serverErrors.password;
+        if (serverErrors.confirm_password) newErrors.confirmPassword = Array.isArray(serverErrors.confirm_password) ? serverErrors.confirm_password[0] : serverErrors.confirm_password;
+        if (serverErrors.error) newErrors.general = serverErrors.error;
+        if (serverErrors.detail && !newErrors.general) newErrors.general = serverErrors.detail;
+        
+        setErrors(newErrors);
+        if (!newErrors.email && !newErrors.password && !newErrors.confirmPassword && !newErrors.general) {
+          setErrors(prev => ({ ...prev, general: "Registration failed. Please check your details." }));
+        }
       } else {
-        setErrors(prev => ({ ...prev, general: "Registration failed. Please try again." }));
+        setErrors(prev => ({ ...prev, general: "Connection error. Please try again later." }));
       }
     } finally {
       setIsLoading(false);

@@ -11,6 +11,27 @@ import {
   Info,
   LogOut
 } from "lucide-react";
+import api, { endpoints, dispatchRefresh } from "../helpers/api";
+
+function SettingsItem({ icon: Icon, label, sublabel, color, onClick, trailing }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full px-6 py-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all active:scale-[0.98]"
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shadow-sm`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+        <div className="text-left">
+          <p className="font-black text-gray-800 dark:text-white text-sm uppercase tracking-tight">{label}</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{sublabel}</p>
+        </div>
+      </div>
+      {trailing || <ChevronRight className="w-5 h-5 text-gray-300" />}
+    </button>
+  );
+}
 
 export function SettingsScreen() {
   const navigate = useNavigate();
@@ -22,24 +43,38 @@ export function SettingsScreen() {
     loadSettings();
   }, []);
 
-  const loadSettings = () => {
-    const email = localStorage.getItem('currentUserEmail');
+  const loadSettings = async () => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const email = user.email || user.username || 'guest';
     const savedDarkMode = localStorage.getItem(`darkMode_${email}`) === 'true';
-    const savedPicture = localStorage.getItem(`profilePicture_${email}`);
-    const personalDetails = JSON.parse(localStorage.getItem('personalDetails') || '{}');
-    
     setDarkMode(savedDarkMode);
-    setProfilePicture(savedPicture);
-    setUserName(personalDetails.name || 'User');
 
     // Apply dark mode to body
     if (savedDarkMode) {
       document.documentElement.classList.add('dark');
     }
+
+    try {
+      const response = await api.get(endpoints.profile);
+      if (response.data) {
+        setUserName(response.data.name || 'User');
+        setProfilePicture(response.data.profilePictureUrl);
+      }
+    } catch (error) {
+      console.error("Failed to load profile settings:", error);
+      // Fallback
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const email = user.email || user.username || 'guest';
+      const personalDetails = JSON.parse(localStorage.getItem(`personalDetails_${email}`) || '{}');
+      setUserName(personalDetails.name || 'User');
+      const savedPicture = localStorage.getItem(`profilePicture_${email}`);
+      setProfilePicture(savedPicture);
+    }
   };
 
   const toggleDarkMode = () => {
-    const email = localStorage.getItem('currentUserEmail');
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const email = user.email || user.username || 'guest';
     const newMode = !darkMode;
     setDarkMode(newMode);
     localStorage.setItem(`darkMode_${email}`, String(newMode));
@@ -50,31 +85,12 @@ export function SettingsScreen() {
       document.documentElement.classList.remove('dark');
     }
     
-    // Trigger a storage event to notify other components
-    window.dispatchEvent(new Event('storage'));
-  };
-
-  const handleProfilePictureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const email = localStorage.getItem('currentUserEmail');
-        localStorage.setItem(`profilePicture_${email}`, base64String);
-        setProfilePicture(base64String);
-        
-        // Trigger storage event to update other components
-        window.dispatchEvent(new Event('storage'));
-      };
-      reader.readAsDataURL(file);
-    }
+    dispatchRefresh();
   };
 
   const handleLogout = () => {
     if (confirm("Are you sure you want to logout?")) {
-      localStorage.removeItem('currentUserEmail');
-      localStorage.removeItem('onboardingComplete');
+      localStorage.clear();
       navigate("/welcome");
     }
   };
@@ -93,7 +109,7 @@ export function SettingsScreen() {
       {/* Profile Picture Section */}
       <div className="px-6 -mt-12 mb-6">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Profile Picture</h2>
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Profile Reference</h2>
           
           <div className="flex items-center space-x-4">
             <div className="relative">
@@ -108,19 +124,10 @@ export function SettingsScreen() {
                   <User className="w-10 h-10 text-white" />
                 </div>
               )}
-              <label className="absolute bottom-0 right-0 w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-600 transition shadow-lg">
-                <Camera className="w-4 h-4 text-white" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleProfilePictureUpload}
-                  className="hidden"
-                />
-              </label>
             </div>
             <div>
               <p className="font-medium text-gray-800 dark:text-white">{userName}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Tap camera to change</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Manage via profile settings</p>
             </div>
           </div>
         </div>
@@ -211,7 +218,7 @@ export function SettingsScreen() {
               <Info className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               <div className="text-left">
                 <p className="font-medium text-gray-800 dark:text-white">About</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Version 1.0.0</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Version 2.0.4 Premium</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />

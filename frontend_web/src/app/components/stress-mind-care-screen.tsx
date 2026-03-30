@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Heart, Moon, Salad, Coffee, Wind, Clock, Bell, Sun, TrendingUp, Target, Brain } from "lucide-react";
 import { useNavigate } from "react-router";
-import api, { endpoints } from "../helpers/api";
+import api, { endpoints, dispatchRefresh } from "../helpers/api";
 
 interface SleepLog {
   bedtime: string;
@@ -77,7 +77,8 @@ export function StressMindCareScreen() {
     loadUserAge();
     
     const reminderInterval = setInterval(() => {
-      const email = localStorage.getItem('currentUserEmail');
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const email = user.email || user.username || 'guest';
       const savedReminder = localStorage.getItem(`sleepReminder_${email}`);
       const savedSchedule = localStorage.getItem(`sleepSchedule_${email}`);
       
@@ -119,7 +120,8 @@ export function StressMindCareScreen() {
       }
     } catch (error) {
        console.error("Age fetch failed:", error);
-       const email = localStorage.getItem('currentUserEmail');
+       const user = JSON.parse(localStorage.getItem("user") || "{}");
+       const email = user.email || user.username || 'guest';
        const personalDetails = JSON.parse(localStorage.getItem(`personalDetails_${email}`) || '{}');
        setUserAge(personalDetails.age || 25);
     }
@@ -128,7 +130,7 @@ export function StressMindCareScreen() {
   const loadSleepData = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/sleep/");
+      const response = await api.get(endpoints.sleepLogs);
       if (response.data && response.data.results) {
         setSleepLogs(response.data.results.map((log: any) => ({
           bedtime: log.bedtime,
@@ -136,7 +138,7 @@ export function StressMindCareScreen() {
           duration: log.duration_display || "0h 0m",
           durationMinutes: log.duration_minutes || 0,
           quality: log.quality,
-          date: log.date,
+          date: new Date(log.date).toDateString(),
           motivationMessage: log.motivation_message || ""
         })));
         
@@ -145,7 +147,8 @@ export function StressMindCareScreen() {
       }
     } catch (error) {
       console.error("Sleep data fetch failed:", error);
-      const email = localStorage.getItem('currentUserEmail');
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const email = user.email || user.username || 'guest';
       const savedLogs = localStorage.getItem(`sleepLogs_${email}`);
       if (savedLogs) {
         const logs = JSON.parse(savedLogs);
@@ -171,56 +174,34 @@ export function StressMindCareScreen() {
     setWeeklyAverage(Math.round(avgHours * 10) / 10);
   };
 
-  const saveSleepSchedule = () => {
-    const email = localStorage.getItem('currentUserEmail');
+  const saveSleepSchedule = async () => {
     const newSchedule = {
       bedtime: convertTo24Hour(bedtimeUI.hour, bedtimeUI.minute, bedtimeUI.period),
       wakeTime: convertTo24Hour(wakeTimeUI.hour, wakeTimeUI.minute, wakeTimeUI.period)
     };
-    setSleepSchedule(newSchedule);
-    localStorage.setItem(`sleepSchedule_${email}`, JSON.stringify(newSchedule));
-    setShowSleepSchedule(false);
     
-    // Automatically log sleep with new schedule
-    const today = new Date().toDateString();
-    const { duration, durationMinutes } = calculateSleepDuration(newSchedule.bedtime, newSchedule.wakeTime);
-    const qualityInfo = getSleepQualityByAge(durationMinutes, userAge);
-    
-    const newLog: SleepLog = {
-      date: today,
-      bedtime: newSchedule.bedtime,
-      wakeTime: newSchedule.wakeTime,
-      duration: duration,
-      durationMinutes: durationMinutes,
-      quality: qualityInfo.label,
-      motivationMessage: getMotivationMessage(qualityInfo.label)
-    };
-    
-    const updatedLogs = [newLog, ...sleepLogs.filter(log => log.date !== today)].slice(0, 7);
-    setSleepLogs(updatedLogs);
-    localStorage.setItem(`sleepLogs_${email}`, JSON.stringify(updatedLogs));
-    
-    // Also save to old format for home dashboard compatibility
-    const oldFormatLog = {
-      hours: parseFloat((durationMinutes / 60).toFixed(1)),
-      quality: qualityInfo.label.toLowerCase(),
-      bedtime: newSchedule.bedtime,
-      wakeTime: newSchedule.wakeTime,
-      timestamp: new Date().toISOString()
-    };
-    
-    const oldLogs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    const filteredOldLogs = oldLogs.filter((log: any) => 
-      new Date(log.timestamp).toDateString() !== today
-    );
-    filteredOldLogs.push(oldFormatLog);
-    localStorage.setItem(`sleepLogs_${email}`, JSON.stringify(filteredOldLogs));
-    
-    calculateWeeklyAverage(updatedLogs);
+    try {
+      await api.post(endpoints.sleepSchedule, {
+        bedtime: newSchedule.bedtime,
+        wake_time: newSchedule.wakeTime
+      });
+      setSleepSchedule(newSchedule);
+      setShowSleepSchedule(false);
+      loadSleepData(); // Refresh logs as backend might auto-create one
+    } catch (error) {
+      console.error("Sleep schedule save failed:", error);
+      // Fallback
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const email = user.email || user.username || 'guest';
+      setSleepSchedule(newSchedule);
+      localStorage.setItem(`sleepSchedule_${email}`, JSON.stringify(newSchedule));
+      setShowSleepSchedule(false);
+    }
   };
 
   const toggleReminder = () => {
-    const email = localStorage.getItem('currentUserEmail');
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const email = user.email || user.username || 'guest';
     const newValue = !reminderEnabled;
     setReminderEnabled(newValue);
     localStorage.setItem(`sleepReminder_${email}`, String(newValue));
@@ -354,44 +335,22 @@ export function StressMindCareScreen() {
     return qualityMessages[Math.floor(Math.random() * qualityMessages.length)];
   };
 
-  const logSleep = () => {
-    const email = localStorage.getItem('currentUserEmail');
-    const today = new Date().toDateString();
-    
-    const { duration, durationMinutes } = calculateSleepDuration(sleepSchedule.bedtime, sleepSchedule.wakeTime);
+  const logSleep = async () => {
+    const { durationMinutes } = calculateSleepDuration(sleepSchedule.bedtime, sleepSchedule.wakeTime);
     const qualityInfo = getSleepQualityByAge(durationMinutes, userAge);
     
-    const newLog: SleepLog = {
-      date: today,
-      bedtime: sleepSchedule.bedtime,
-      wakeTime: sleepSchedule.wakeTime,
-      duration: duration,
-      durationMinutes: durationMinutes,
-      quality: qualityInfo.label,
-      motivationMessage: getMotivationMessage(qualityInfo.label)
-    };
-    
-    const updatedLogs = [newLog, ...sleepLogs.filter(log => log.date !== today)].slice(0, 7);
-    setSleepLogs(updatedLogs);
-    localStorage.setItem(`sleepLogs_${email}`, JSON.stringify(updatedLogs));
-    
-    // Also save to old format for home dashboard compatibility
-    const oldFormatLog = {
-      hours: parseFloat((durationMinutes / 60).toFixed(1)),
-      quality: qualityInfo.label.toLowerCase(),
-      bedtime: sleepSchedule.bedtime,
-      wakeTime: sleepSchedule.wakeTime,
-      timestamp: new Date().toISOString()
-    };
-    
-    const oldLogs = JSON.parse(localStorage.getItem(`sleepLogs_${email}`) || '[]');
-    const filteredOldLogs = oldLogs.filter((log: any) => 
-      new Date(log.timestamp).toDateString() !== today
-    );
-    filteredOldLogs.push(oldFormatLog);
-    localStorage.setItem(`sleepLogs_${email}`, JSON.stringify(filteredOldLogs));
-    
-    calculateWeeklyAverage(updatedLogs);
+    try {
+      await api.post(endpoints.sleepLogs, {
+        bedtime: sleepSchedule.bedtime,
+        wake_time: sleepSchedule.wakeTime,
+        quality: qualityInfo.label
+      });
+      loadSleepData();
+      dispatchRefresh();
+    } catch (error) {
+      console.error("Sleep log failed:", error);
+      // Local fallback logic removed to prioritize backend sync
+    }
   };
 
   const getTodaySleep = () => {

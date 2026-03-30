@@ -39,6 +39,28 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Android Matching Colors */
+  --success-green: #16A34A;
+  --warning-orange: #F97316;
+  --protein-blue: #3B82F6;
+  --carbs-orange: #F97316;
+  --fats-yellow: #EAB308;
+  --primary-green-vibrant: #00C853;
+  --water-blue-dark: #2196F3;
+  --calorie-orange: #FF9800;
+  --error-red: #DC2626;
+  
+  /* Android Matching Gradients */
+  --water-gradient: linear-gradient(135deg, #00C6FF 0%, #0072FF 100%);
+  --steps-gradient: linear-gradient(135deg, #00B09B 0%, #96C93D 100%);
+  --log-food-gradient: linear-gradient(135deg, #FF9472 0%, #F2709C 100%);
+  --ai-gradient: linear-gradient(135deg, #DA22FF 0%, #9733EE 100%);
+  --settings-gradient: linear-gradient(135deg, #6A1B9A 0%, #8E24AA 100%);
+  --profile-gradient: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --help-gradient: linear-gradient(135deg, #FFA726 0%, #F4511E 100%);
+  --insights-gradient: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+  --recipe-header-gradient: linear-gradient(135deg, #F59E0B 0%, #F97316 100%);
 }
 
 .dark {
@@ -76,6 +98,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  /* Dark mode variants for specific colors if needed */
+  --protein-blue: #60A5FA;
+  --carbs-orange: #FB923C;
+  --fats-yellow: #FACC15;
 }
 
 @theme inline {
@@ -117,6 +144,27 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Android Custom Theme Extensions */
+  --color-success-green: var(--success-green);
+  --color-warning-orange: var(--warning-orange);
+  --color-protein-blue: var(--protein-blue);
+  --color-carbs-orange: var(--carbs-orange);
+  --color-fats-yellow: var(--fats-yellow);
+  --color-primary-green-vibrant: var(--primary-green-vibrant);
+  --color-water-blue-dark: var(--water-blue-dark);
+  --color-calorie-orange: var(--calorie-orange);
+  --color-error-red: var(--error-red);
+  
+  --background-image-water-gradient: var(--water-gradient);
+  --background-image-steps-gradient: var(--steps-gradient);
+  --background-image-log-food-gradient: var(--log-food-gradient);
+  --background-image-ai-gradient: var(--ai-gradient);
+  --background-image-settings-gradient: var(--settings-gradient);
+  --background-image-profile-gradient: var(--profile-gradient);
+  --background-image-help-gradient: var(--help-gradient);
+  --background-image-insights-gradient: var(--insights-gradient);
+  --background-image-recipe-header-gradient: var(--recipe-header-gradient);
 }
 
 @layer base {

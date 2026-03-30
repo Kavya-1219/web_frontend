@@ -14,4 +14,12 @@ export default defineConfig({
       'figma:asset': path.resolve(__dirname, './src/assets'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://180.235.121.253:8107',
+        changeOrigin: true,
+      }
+    }
+  }
 })

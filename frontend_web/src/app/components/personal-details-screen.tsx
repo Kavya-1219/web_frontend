@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { User, ArrowLeft } from "lucide-react";
+import api, { endpoints } from "../helpers/api";
+import { User, ArrowLeft, Loader2 } from "lucide-react";
 
 export function PersonalDetailsScreen() {
   const navigate = useNavigate();
@@ -9,12 +10,29 @@ export function PersonalDetailsScreen() {
     age: "",
     gender: "Male",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name && formData.age) {
-      localStorage.setItem("personalDetails", JSON.stringify(formData));
-      navigate("/body-details");
+      setIsLoading(true);
+      try {
+        localStorage.setItem("personalDetails", JSON.stringify(formData));
+        
+        await api.post(endpoints.personalDetails, {
+          name: formData.name,
+          age: parseInt(formData.age),
+          gender: formData.gender
+        });
+
+        navigate("/body-details");
+      } catch (error) {
+        console.error("Failed to save personal details:", error);
+        // Still navigate for now to not block the user, though ideally we show an error
+        navigate("/body-details");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -127,14 +145,21 @@ export function PersonalDetailsScreen() {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={!formData.name || !formData.age}
-                className={`w-full py-5 rounded-2xl font-black text-lg transition-all transform hover:scale-[1.01] active:scale-[0.99] ${
-                  formData.name && formData.age
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-xl shadow-green-200 hover:shadow-2xl"
-                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                disabled={isLoading || !formData.name || !formData.age}
+                className={`w-full py-4 rounded-xl shadow-lg transition flex items-center justify-center font-black text-lg ${
+                  isLoading || !formData.name || !formData.age
+                    ? "bg-gray-400 cursor-not-allowed text-gray-600"
+                    : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
                 }`}
               >
-                Continue to Body Details
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Saving Details...
+                  </>
+                ) : (
+                  "Continue to Body Details"
+                )}
               </button>
             </div>
           </form>
